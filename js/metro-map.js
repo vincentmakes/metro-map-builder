@@ -269,21 +269,34 @@ class MetroMap {
   }
 
   createDefs() {
-    // Gradients
+    // Gradients - use proper SVG element creation for better compatibility
     const progressV = this.createSVG('linearGradient', { id: 'grad-progress-v', x1: '0%', y1: '0%', x2: '0%', y2: '100%' });
-    progressV.innerHTML = `<stop offset="0%" stop-color="${this.getColor('success')}"/><stop offset="50%" stop-color="${this.getColor('primary')}"/><stop offset="100%" stop-color="${this.getColor('muted')}"/>`;
+    progressV.appendChild(this.createSVG('stop', { offset: '0%', 'stop-color': this.getColor('success') }));
+    progressV.appendChild(this.createSVG('stop', { offset: '50%', 'stop-color': this.getColor('primary') }));
+    progressV.appendChild(this.createSVG('stop', { offset: '100%', 'stop-color': this.getColor('muted') }));
     this.defs.appendChild(progressV);
 
     const progressH = this.createSVG('linearGradient', { id: 'grad-progress-h', x1: '0%', y1: '0%', x2: '100%', y2: '0%' });
-    progressH.innerHTML = `<stop offset="0%" stop-color="${this.getColor('success')}"/><stop offset="50%" stop-color="${this.getColor('primary')}"/><stop offset="100%" stop-color="${this.getColor('muted')}"/>`;
+    progressH.appendChild(this.createSVG('stop', { offset: '0%', 'stop-color': this.getColor('success') }));
+    progressH.appendChild(this.createSVG('stop', { offset: '50%', 'stop-color': this.getColor('primary') }));
+    progressH.appendChild(this.createSVG('stop', { offset: '100%', 'stop-color': this.getColor('muted') }));
     this.defs.appendChild(progressH);
 
     const glow = this.createSVG('radialGradient', { id: 'grad-glow' });
-    glow.innerHTML = `<stop offset="0%" stop-color="${this.getColor('accent')}" stop-opacity="0.5"/><stop offset="100%" stop-color="${this.getColor('accent')}" stop-opacity="0"/>`;
+    glow.appendChild(this.createSVG('stop', { offset: '0%', 'stop-color': this.getColor('accent'), 'stop-opacity': '0.5' }));
+    glow.appendChild(this.createSVG('stop', { offset: '100%', 'stop-color': this.getColor('accent'), 'stop-opacity': '0' }));
     this.defs.appendChild(glow);
 
+    // Create Inkscape-compatible shadow filter using filter primitives
     const shadow = this.createSVG('filter', { id: 'shadow', x: '-50%', y: '-50%', width: '200%', height: '200%' });
-    shadow.innerHTML = `<feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="${this.getColor('dark')}" flood-opacity="0.12"/>`;
+    shadow.appendChild(this.createSVG('feGaussianBlur', { in: 'SourceAlpha', stdDeviation: '2', result: 'blur' }));
+    shadow.appendChild(this.createSVG('feOffset', { in: 'blur', dx: '0', dy: '2', result: 'offsetBlur' }));
+    shadow.appendChild(this.createSVG('feFlood', { 'flood-color': this.getColor('dark'), 'flood-opacity': '0.12', result: 'color' }));
+    shadow.appendChild(this.createSVG('feComposite', { in: 'color', in2: 'offsetBlur', operator: 'in', result: 'shadow' }));
+    const merge = this.createSVG('feMerge');
+    merge.appendChild(this.createSVG('feMergeNode', { in: 'shadow' }));
+    merge.appendChild(this.createSVG('feMergeNode', { in: 'SourceGraphic' }));
+    shadow.appendChild(merge);
     this.defs.appendChild(shadow);
   }
 
@@ -994,27 +1007,79 @@ class MetroMap {
     // Clone the SVG to avoid modifying the original
     const svgClone = this.svg.cloneNode(true);
     
-    // Set explicit dimensions for export
+    // Set explicit dimensions and namespaces for export
     svgClone.setAttribute('width', this.config.width);
     svgClone.setAttribute('height', this.config.height);
     svgClone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
     svgClone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+    svgClone.setAttribute('version', '1.1');
     
     // Remove interactive classes that won't be styled
     svgClone.removeAttribute('class');
     
-    // Embed font style in defs
-    const defs = svgClone.querySelector('defs');
-    if (defs) {
-      const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
-      style.textContent = `
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        text { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
-      `;
-      defs.insertBefore(style, defs.firstChild);
+    // Remove interactive classes from all elements
+    svgClone.querySelectorAll('[class]').forEach(el => {
+      el.removeAttribute('class');
+    });
+    
+    // Get defs or create one
+    let defs = svgClone.querySelector('defs');
+    if (!defs) {
+      defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+      svgClone.insertBefore(defs, svgClone.firstChild);
     }
     
-    return svgClone.outerHTML;
+    // Replace feDropShadow with compatible filter primitives for Inkscape
+    const shadowFilter = defs.querySelector('#shadow');
+    if (shadowFilter) {
+      // Create Inkscape-compatible shadow filter
+      shadowFilter.innerHTML = `
+        <feGaussianBlur in="SourceAlpha" stdDeviation="2" result="blur"/>
+        <feOffset in="blur" dx="0" dy="2" result="offsetBlur"/>
+        <feFlood flood-color="${this.getColor('dark')}" flood-opacity="0.12" result="color"/>
+        <feComposite in="color" in2="offsetBlur" operator="in" result="shadow"/>
+        <feMerge>
+          <feMergeNode in="shadow"/>
+          <feMergeNode in="SourceGraphic"/>
+        </feMerge>
+      `;
+    }
+    
+    // Add embedded font style - use system font fallback for Inkscape compatibility
+    const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+    style.setAttribute('type', 'text/css');
+    style.textContent = `
+      @font-face {
+        font-family: 'Inter';
+        src: local('Inter'), local('Inter-Regular'), local('Arial'), local('Helvetica');
+      }
+      text { 
+        font-family: 'Inter', 'Arial', 'Helvetica', sans-serif; 
+      }
+    `;
+    defs.insertBefore(style, defs.firstChild);
+    
+    // Add explicit font-family to all text elements for Inkscape
+    svgClone.querySelectorAll('text, tspan').forEach(textEl => {
+      if (!textEl.getAttribute('font-family')) {
+        textEl.setAttribute('font-family', "'Inter', 'Arial', 'Helvetica', sans-serif");
+      }
+    });
+    
+    // Ensure all gradients have proper stop elements (fix innerHTML issues)
+    defs.querySelectorAll('linearGradient, radialGradient').forEach(grad => {
+      // Re-create stops properly if needed
+      const stops = grad.querySelectorAll('stop');
+      stops.forEach(stop => {
+        // Ensure stop-color and stop-opacity are attributes, not styles
+        const color = stop.getAttribute('stop-color') || stop.style.stopColor;
+        const opacity = stop.getAttribute('stop-opacity') || stop.style.stopOpacity || '1';
+        if (color) stop.setAttribute('stop-color', color);
+        if (opacity) stop.setAttribute('stop-opacity', opacity);
+      });
+    });
+    
+    return '<?xml version="1.0" encoding="UTF-8"?>\n' + svgClone.outerHTML;
   }
   
   toDataURL() {
