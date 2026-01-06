@@ -1,0 +1,1582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Metro Map Builder | Architecting Tomorrow</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link id="theme-stylesheet" rel="stylesheet" href="css/metro-builder-default.css">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="header-group">
+        <h1>Metro Map Builder</h1>
+      </div>
+      <div class="header-group">
+        <select class="theme-select" id="theme-select" onchange="switchTheme(this.value)">
+          <option value="default">Default</option>
+          <option value="s-theme">S-Theme</option>
+        </select>
+        <input type="file" id="import-input" accept=".json" style="display:none">
+        <button class="btn btn-secondary" onclick="document.getElementById('import-input').click()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Import
+        </button>
+        <button class="btn btn-secondary" onclick="exportJSON()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          JSON
+        </button>
+        <button class="btn btn-primary" onclick="exportSVG()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          SVG
+        </button>
+      </div>
+    </header>
+    
+    <aside class="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-title">Settings</div>
+        <div class="form-group">
+          <label class="form-label">Title</label>
+          <input type="text" class="form-input" id="inp-title" placeholder="Roadmap Title" oninput="state.data.title=this.value;render()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Orientation</label>
+          <div class="toggle">
+            <button class="toggle-opt active" data-v="vertical" onclick="setOrientation('vertical')">Vertical</button>
+            <button class="toggle-opt" data-v="horizontal" onclick="setOrientation('horizontal')">Horizontal</button>
+          </div>
+        </div>
+      </div>
+      
+      <div class="sidebar-section grow">
+        <div class="sidebar-title">
+          Tracks
+          <button class="btn btn-primary btn-sm" onclick="addTrack()">+ Add</button>
+        </div>
+        <div id="track-list"></div>
+      </div>
+      
+      <div class="sidebar-section collapsible collapsed">
+        <div class="sidebar-title collapse-toggle" onclick="toggleSection(this)">
+          <span>Layout & Spacing</span>
+          <svg class="collapse-icon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+        <div class="collapse-content">
+          <div class="form-group">
+            <label class="form-label">Canvas Size <span id="auto-size-display" class="auto-size"></span></label>
+            <div class="size-toggle">
+              <button class="size-opt active" data-v="auto" onclick="setSizeMode('auto')">Auto</button>
+              <button class="size-opt" data-v="manual" onclick="setSizeMode('manual')">Manual</button>
+            </div>
+          </div>
+          <div class="form-row" id="manual-size-row" style="display:none">
+            <div class="form-group">
+              <label class="form-label">Width</label>
+              <input type="number" class="form-input" id="inp-width" value="800" min="100" step="50" onchange="updateSize()">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Height</label>
+              <input type="number" class="form-input" id="inp-height" value="600" min="100" step="50" onchange="updateSize()">
+            </div>
+          </div>
+          <div class="size-presets" id="size-presets" style="display:none">
+            <button class="preset-btn" onclick="setPresetSize(800,600)">800×600</button>
+            <button class="preset-btn" onclick="setPresetSize(1200,800)">1200×800</button>
+            <button class="preset-btn" onclick="setPresetSize(1920,1080)">HD</button>
+            <button class="preset-btn" onclick="setPresetSize(2400,1600)">2K</button>
+            <button class="preset-btn" onclick="setPresetSize(3840,2160)">4K</button>
+            <button class="preset-btn" onclick="setPresetSize(800,2000)">Tall</button>
+            <button class="preset-btn" onclick="setPresetSize(3000,600)">Wide</button>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Track Gap</label>
+              <input type="number" class="form-input" id="inp-track-gap" value="140" min="40" onchange="state.config.trackSpacing=+this.value;render()">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Station Gap</label>
+              <input type="number" class="form-input" id="inp-station-gap" value="100" min="30" onchange="state.config.stationSpacing=+this.value;render()">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Line Width</label>
+              <input type="number" class="form-input" id="inp-line-width" value="6" min="2" max="16" onchange="state.config.lineWidth=+this.value;render()">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Station Size</label>
+              <input type="number" class="form-input" id="inp-station-size" value="12" min="6" max="24" onchange="state.config.stationRadius=+this.value;render()">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Background Color</label>
+            <div class="bg-color-row">
+              <div class="colors" id="bg-colors"></div>
+              <input type="color" class="color-input" id="inp-bg-color" value="#eff6ff" onchange="setBgColor(this.value)">
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="sidebar-section collapsible collapsed">
+        <div class="sidebar-title collapse-toggle" onclick="toggleSection(this)">
+          <span>Text & Labels</span>
+          <svg class="collapse-icon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+        <div class="collapse-content">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Text Size</label>
+              <div class="stepper">
+                <button class="stepper-btn" onclick="adjustFontSize(-1)">−</button>
+                <span class="stepper-val" id="font-size-val">0</span>
+                <button class="stepper-btn" onclick="adjustFontSize(1)">+</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Text Color</label>
+              <input type="color" class="color-input" id="inp-text-color" value="#1e293b" onchange="setGlobalTextColor(this.value)" style="width:100%">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Track Title</label>
+            <div class="inline-options">
+              <label class="form-label" style="margin:0">BG:</label>
+              <input type="color" class="color-input" id="inp-title-bg" value="#ffffff" onchange="setGlobalTitleBg(this.value)">
+              <label class="checkbox-label">
+                <input type="checkbox" id="inp-title-border" checked onchange="setGlobalTitleBorder(this.checked)">
+                Border
+              </label>
+              <input type="color" class="color-input" id="inp-title-border-color" value="#e2e8f0" onchange="setGlobalTitleBorderColor(this.value)">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Title Padding</label>
+              <div class="stepper">
+                <button class="stepper-btn" onclick="adjustTitlePadding(-2)">−</button>
+                <span class="stepper-val" id="title-padding-val">12</span>
+                <button class="stepper-btn" onclick="adjustTitlePadding(2)">+</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Label Offset</label>
+              <div class="stepper">
+                <button class="stepper-btn" onclick="adjustLabelOffset(-2)">−</button>
+                <span class="stepper-val" id="label-offset-val">8</span>
+                <button class="stepper-btn" onclick="adjustLabelOffset(2)">+</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="sidebar-section">
+        <button class="btn btn-secondary btn-block" onclick="resetAllPositions()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+          Reset All Spacing
+        </button>
+      </div>
+    </aside>
+    
+    <!-- Toolbar Row -->
+    <div class="toolbar-row">
+      <button class="tool-btn active" data-tool="select" onclick="setTool('select')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/></svg>
+        Select
+      </button>
+      <button class="tool-btn" data-tool="station" onclick="setTool('station')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        Station
+      </button>
+      <button class="tool-btn" data-tool="crossing" onclick="setTool('crossing')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+        Crossing
+      </button>
+      <div class="tool-sep"></div>
+      <button class="tool-btn" onclick="zoomOut()" title="Zoom Out (-)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+      </button>
+      <span class="zoom-label" id="zoom-label">100%</span>
+      <button class="tool-btn" onclick="zoomIn()" title="Zoom In (+)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+      </button>
+      <button class="tool-btn" onclick="zoomReset()" title="Reset to 100%">100%</button>
+      <div class="tool-sep"></div>
+      <button class="tool-btn" onclick="loadExample()">Example</button>
+    </div>
+    
+    <!-- Canvas Area -->
+    <main class="canvas-wrap" id="canvas-wrap">
+      <!-- Metro Map SVG -->
+      <div id="map-canvas"></div>
+      
+      <div class="hint-bar" id="hint">Drag stations to reposition. Double-click to edit. Right-click for options.</div>
+    </main>
+  </div>
+  
+  <!-- Floating Legend (outside grid for fixed positioning) -->
+  <div class="floating-panel" id="legend-panel" style="right: 20px; top: 120px;">
+    <div class="panel-header" onmousedown="startDragPanel(event, 'legend-panel')">
+      <span>Legend</span>
+      <button class="panel-close" onclick="togglePanel('legend-panel')"></button>
+    </div>
+    <div class="panel-body">
+      <div class="legend-item"><span class="legend-dot completed"></span> Completed</div>
+      <div class="legend-item"><span class="legend-dot active"></span> Active</div>
+      <div class="legend-item"><span class="legend-dot milestone"></span> Milestone</div>
+      <div class="legend-item"><span class="legend-dot future"></span> Future</div>
+      <div class="legend-item"><span class="legend-dot default"></span> Default</div>
+    </div>
+  </div>
+  
+  <!-- Context Menu -->
+  <div class="ctx-menu" id="ctx-menu">
+    <div class="ctx-item" onclick="ctxEdit()">Edit</div>
+    <div class="ctx-item" onclick="ctxDuplicate()">Duplicate</div>
+    <div class="ctx-item" onclick="ctxResetPos()">Reset Position</div>
+    <div class="ctx-sep"></div>
+    <div class="ctx-item danger" onclick="ctxDelete()">Delete</div>
+  </div>
+  
+  <!-- Station Modal -->
+  <div class="modal-bg" id="modal-station">
+    <div class="modal">
+      <div class="modal-head">
+        <h3>Edit Station</h3>
+        <button class="btn btn-sm btn-secondary" onclick="closeModal('station')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Name</label>
+          <input type="text" class="form-input" id="sta-name">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Date / Label</label>
+          <input type="text" class="form-input" id="sta-date" placeholder="Q1 2024">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <div class="status-pills" id="sta-status">
+            <span class="status-pill default selected" data-s="default">Default</span>
+            <span class="status-pill completed" data-s="completed">Done</span>
+            <span class="status-pill active" data-s="active">Active</span>
+            <span class="status-pill milestone" data-s="milestone">Milestone</span>
+            <span class="status-pill future" data-s="future">Future</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Label Position</label>
+          <div class="status-pills" id="sta-label-pos">
+            <span class="status-pill default selected" data-p="auto">Auto</span>
+            <span class="status-pill default" data-p="top">Top</span>
+            <span class="status-pill default" data-p="bottom">Bottom</span>
+            <span class="status-pill default" data-p="left">Left</span>
+            <span class="status-pill default" data-p="right">Right</span>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Label Offset</label>
+            <div class="stepper">
+              <button class="stepper-btn" onclick="adjustStationOffset(-5)">−</button>
+              <span class="stepper-val" id="sta-offset-val">0</span>
+              <button class="stepper-btn" onclick="adjustStationOffset(5)">+</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Station Size</label>
+            <input type="number" class="form-input" id="sta-radius" placeholder="Default" min="6" max="30">
+          </div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-secondary" onclick="closeModal('station')">Cancel</button>
+        <button class="btn btn-primary" onclick="saveStation()">Save</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Track Modal -->
+  <div class="modal-bg" id="modal-track">
+    <div class="modal">
+      <div class="modal-head">
+        <h3>Edit Track</h3>
+        <button class="btn btn-sm btn-secondary" onclick="closeModal('track')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Name</label>
+          <input type="text" class="form-input" id="trk-name">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <input type="text" class="form-input" id="trk-desc" placeholder="Optional subtitle">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Color</label>
+          <div class="colors" id="trk-colors"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Style</label>
+            <select class="form-select" id="trk-style">
+              <option value="solid">Solid</option>
+              <option value="gradient">Gradient</option>
+              <option value="dashed">Dashed</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Line Width</label>
+            <input type="number" class="form-input" id="trk-line-width" placeholder="Default" min="2" max="16">
+          </div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-danger" onclick="deleteTrack()" style="margin-right:auto">Delete</button>
+        <button class="btn btn-secondary" onclick="closeModal('track')">Cancel</button>
+        <button class="btn btn-primary" onclick="saveTrack()">Save</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Crossing Modal -->
+  <div class="modal-bg" id="modal-crossing">
+    <div class="modal">
+      <div class="modal-head">
+        <h3>Edit Crossing</h3>
+        <button class="btn btn-sm btn-secondary" onclick="closeModal('crossing')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Color</label>
+          <div class="colors" id="cross-colors"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Style</label>
+            <select class="form-select" id="cross-style">
+              <option value="bezier">Bezier</option>
+              <option value="metro">Metro 45°</option>
+              <option value="metro-smooth">Metro Smooth</option>
+              <option value="straight">Straight</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Marker</label>
+            <select class="form-select" id="cross-marker">
+              <option value="circle">Circle</option>
+              <option value="diamond">Diamond</option>
+              <option value="dot">Dot</option>
+              <option value="none">None</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Label</label>
+          <input type="text" class="form-input" id="cross-label" placeholder="Integration Point">
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-danger" onclick="deleteCrossing()" style="margin-right:auto">Delete</button>
+        <button class="btn btn-secondary" onclick="closeModal('crossing')">Cancel</button>
+        <button class="btn btn-primary" onclick="saveCrossing()">Save</button>
+      </div>
+    </div>
+  </div>
+  
+  <div class="toast" id="toast"></div>
+
+  <script src="js/metro-map.js"></script>
+  <script>
+    // =============================================
+    // State
+    // =============================================
+    const COLORS = ['#1e3a8a','#0284c7','#0891b2','#D63384','#10b981','#f59e0b','#8b5cf6','#64748b'];
+    
+    const state = {
+      config: { 
+        orientation: 'vertical', 
+        trackSpacing: 140, 
+        stationSpacing: 100, 
+        lineWidth: 6, 
+        stationRadius: 12,
+        backgroundColor: '#eff6ff',
+        backgroundRadius: 0,
+        autoFit: true,
+        showLegend: false,
+        width: 800,
+        height: 600,
+        // Global text settings
+        fontSizeAdjust: 0,  // Relative adjustment to base font sizes
+        textColor: '#1e293b',
+        labelOffset: 8,
+        // Title box settings
+        titleBg: '#ffffff',
+        titleBorder: true,
+        titleBorderColor: '#e2e8f0',
+        titlePadding: 12
+      },
+      data: { title: '', tracks: [], crossings: [], phases: [], timeMarkers: [] },
+      tool: 'select',
+      selection: null,
+      crossingStart: null,
+      drag: null,
+      zoom: 1,
+      sizeMode: 'auto' // 'auto' or 'manual'
+    };
+    
+    const BG_COLORS = ['#eff6ff', '#f0fdf4', '#fdf2f8', '#fef3c7', '#f1f5f9', '#ffffff', '#0a1628', '#1e293b'];
+    
+    let map = null;
+    let currentTheme = 'default';
+    
+    // =============================================
+    // Theme Switching
+    // =============================================
+    function switchTheme(theme) {
+      const stylesheet = document.getElementById('theme-stylesheet');
+      const themeFiles = {
+        'default': 'css/metro-builder-default.css',
+        's-theme': 'css/metro-builder-s-theme.css'
+      };
+      
+      if (themeFiles[theme]) {
+        stylesheet.href = themeFiles[theme];
+        currentTheme = theme;
+        localStorage.setItem('metro-builder-theme', theme);
+        
+        // Update color palettes based on theme
+        updateThemeColors(theme);
+        
+        toast(`Switched to ${theme === 's-theme' ? 'S-Theme' : 'Default'} theme`);
+      }
+    }
+    
+    function updateThemeColors(theme) {
+      // Define theme color palettes for the map library
+      const themeColors = {
+        'default': {
+          primary: '#1e3a8a',
+          secondary: '#0284c7',
+          tertiary: '#0891b2',
+          accent: '#D63384',
+          success: '#10b981',
+          warning: '#f59e0b',
+          muted: '#94a3b8',
+          white: '#ffffff',
+          light: '#f8fafc',
+          paleBlue: '#eff6ff',
+          border: '#e2e8f0',
+          text: '#334155',
+          dark: '#0a1628'
+        },
+        's-theme': {
+          primary: '#003DA5',
+          secondary: '#0062F2',
+          tertiary: '#002EFF',
+          accent: '#002EFF',
+          success: '#30A52D',
+          warning: '#F18100',
+          muted: '#7C9CBF',
+          white: '#ffffff',
+          light: '#F0F6FF',
+          paleBlue: '#F0F6FF',
+          border: '#D0E0F2',
+          text: '#353535',
+          dark: '#001478'
+        }
+      };
+      
+      // Set map library colors
+      state.config.colors = themeColors[theme] || themeColors['default'];
+      
+      // Update track color palette for UI
+      if (theme === 's-theme') {
+        COLORS.length = 0;
+        // Primary blues
+        COLORS.push('#002EFF', '#003DA5', '#0062F2', '#001478');
+        // Status colors
+        COLORS.push('#30A52D', '#F18100', '#CE1618');
+        // Secondary colors (purples, cyans, greens, oranges)
+        COLORS.push('#8F0098', '#7367F0', '#D63384', '#00C8FF', '#20C997', '#FF9F43', '#7C9CBF', '#364064');
+        BG_COLORS.length = 0;
+        BG_COLORS.push('#F0F6FF', '#E8F5E9', '#FFF3E0', '#FFEBEE', '#FFFFFF', '#D0E0F2', '#001478', '#353535');
+        
+        // Update default canvas background
+        if (state.config.backgroundColor === '#eff6ff') {
+          state.config.backgroundColor = '#F0F6FF';
+        }
+      } else {
+        COLORS.length = 0;
+        COLORS.push('#1e3a8a', '#0284c7', '#0891b2', '#D63384', '#10b981', '#f59e0b', '#8b5cf6', '#64748b');
+        BG_COLORS.length = 0;
+        BG_COLORS.push('#eff6ff', '#f0fdf4', '#fdf2f8', '#fef3c7', '#f1f5f9', '#ffffff', '#0a1628', '#1e293b');
+        
+        // Update default canvas background
+        if (state.config.backgroundColor === '#F0F6FF') {
+          state.config.backgroundColor = '#eff6ff';
+        }
+      }
+      
+      // Refresh color picker UI
+      setupColorPickers();
+      
+      // Update canvas background CSS variable
+      document.querySelector('.canvas-wrap').style.setProperty('--canvas-bg', state.config.backgroundColor);
+      
+      // Re-render the map
+      if (map) render();
+    }
+    
+    function loadSavedTheme() {
+      const saved = localStorage.getItem('metro-builder-theme');
+      if (saved && saved !== currentTheme) {
+        document.getElementById('theme-select').value = saved;
+        const stylesheet = document.getElementById('theme-stylesheet');
+        const themeFiles = {
+          'default': 'css/metro-builder-default.css',
+          's-theme': 'css/metro-builder-s-theme.css'
+        };
+        if (themeFiles[saved]) {
+          stylesheet.href = themeFiles[saved];
+          currentTheme = saved;
+          updateThemeColors(saved);
+        }
+      }
+    }
+    
+    // =============================================
+    // Init
+    // =============================================
+    document.addEventListener('DOMContentLoaded', () => {
+      map = new MetroMap('#map-canvas');
+      setupColorPickers();
+      setupEvents();
+      loadExample();
+      loadSavedTheme();
+      
+      // Setup import handler
+      document.getElementById('import-input').addEventListener('change', importJSON);
+    });
+    
+    function setupColorPickers() {
+      const trkColors = document.getElementById('trk-colors');
+      const crossColors = document.getElementById('cross-colors');
+      const bgColors = document.getElementById('bg-colors');
+      
+      // Clear existing color buttons
+      trkColors.innerHTML = '';
+      crossColors.innerHTML = '';
+      bgColors.innerHTML = '';
+      
+      COLORS.forEach(c => {
+        trkColors.innerHTML += `<div class="color-btn" style="background:${c}" data-c="${c}"></div>`;
+        crossColors.innerHTML += `<div class="color-btn" style="background:${c}" data-c="${c}"></div>`;
+      });
+      
+      // Add gradient option for crossings
+      const gradientColors = currentTheme === 's-theme' 
+        ? 'linear-gradient(135deg, #003DA5 0%, #002EFF 100%)'
+        : 'linear-gradient(135deg, #1e3a8a 0%, #D63384 100%)';
+      crossColors.innerHTML += `<div class="color-btn gradient-btn" style="background:${gradientColors}" data-c="gradient" title="Gradient from track colors"></div>`;
+      
+      BG_COLORS.forEach(c => {
+        const border = c === '#ffffff' || c === '#FFFFFF' ? '1px solid #e2e8f0' : 'none';
+        bgColors.innerHTML += `<div class="color-btn" style="background:${c};border:${border}" data-c="${c}"></div>`;
+      });
+      
+      // Background color picker click handler
+      bgColors.onclick = e => {
+        if (e.target.classList.contains('color-btn')) {
+          setBgColor(e.target.dataset.c);
+        }
+      };
+    }
+    
+    function setupEvents() {
+      const canvas = document.getElementById('map-canvas');
+      canvas.addEventListener('mousedown', onMouseDown);
+      canvas.addEventListener('mousemove', onMouseMove);
+      canvas.addEventListener('mouseup', onMouseUp);
+      canvas.addEventListener('dblclick', onDblClick);
+      canvas.addEventListener('contextmenu', onContextMenu);
+      
+      // Wheel zoom
+      document.querySelector('.canvas-wrap').addEventListener('wheel', e => {
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          if (e.deltaY < 0) zoomIn();
+          else zoomOut();
+        }
+      }, { passive: false });
+      
+      document.addEventListener('click', e => {
+        if (!e.target.closest('.ctx-menu')) hideCtxMenu();
+      });
+      
+      document.addEventListener('keydown', e => {
+        if (e.target.tagName === 'INPUT') return;
+        if (e.key === 'Delete' || e.key === 'Backspace') ctxDelete();
+        if (e.key === 'Escape') { clearSelection(); setTool('select'); }
+        if (e.key === '+' || e.key === '=') { e.preventDefault(); zoomIn(); }
+        if (e.key === '-' || e.key === '_') { e.preventDefault(); zoomOut(); }
+        if (e.key === '0') { e.preventDefault(); zoomReset(); }
+      });
+      
+      // Status pills
+      document.querySelectorAll('#sta-status .status-pill').forEach(p => {
+        p.onclick = () => {
+          document.querySelectorAll('#sta-status .status-pill').forEach(x => x.classList.remove('selected'));
+          p.classList.add('selected');
+        };
+      });
+      
+      // Label position pills
+      document.querySelectorAll('#sta-label-pos .status-pill').forEach(p => {
+        p.onclick = () => {
+          document.querySelectorAll('#sta-label-pos .status-pill').forEach(x => x.classList.remove('selected'));
+          p.classList.add('selected');
+        };
+      });
+      
+      // Color pickers
+      document.getElementById('trk-colors').onclick = e => {
+        if (e.target.classList.contains('color-btn')) {
+          document.querySelectorAll('#trk-colors .color-btn').forEach(x => x.classList.remove('selected'));
+          e.target.classList.add('selected');
+        }
+      };
+      document.getElementById('cross-colors').onclick = e => {
+        const btn = e.target.closest('.color-btn');
+        if (btn) {
+          document.querySelectorAll('#cross-colors .color-btn').forEach(x => x.classList.remove('selected'));
+          btn.classList.add('selected');
+        }
+      };
+    }
+    
+    // =============================================
+    // Render
+    // =============================================
+    function render() {
+      map.setConfig(state.config).setData(state.data).render();
+      renderTrackList();
+      applySelection();
+      updateHint();
+      
+      // Sync canvas background with map background
+      document.getElementById('canvas-wrap').style.setProperty('--canvas-bg', state.config.backgroundColor || '#eff6ff');
+      
+      // Show calculated dimensions
+      const svg = document.querySelector('#map-canvas svg');
+      if (svg) {
+        const w = svg.getAttribute('width');
+        const h = svg.getAttribute('height');
+        const display = document.getElementById('auto-size-display');
+        if (state.sizeMode === 'auto') {
+          display.textContent = `(${w}×${h})`;
+        } else {
+          display.textContent = '';
+        }
+      }
+    }
+    
+    function renderTrackList() {
+      const el = document.getElementById('track-list');
+      el.innerHTML = state.data.tracks.map((t, i) => `
+        <div class="track-item ${state.selection?.type==='track'&&state.selection.trackIdx===i?'selected':''}" 
+             data-track-idx="${i}"
+             draggable="true"
+             onclick="selectTrack(${i})" ondblclick="editTrack(${i})">
+          <div class="track-drag" title="Drag to reorder">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="9" cy="6" r="2"/><circle cx="15" cy="6" r="2"/>
+              <circle cx="9" cy="12" r="2"/><circle cx="15" cy="12" r="2"/>
+              <circle cx="9" cy="18" r="2"/><circle cx="15" cy="18" r="2"/>
+            </svg>
+          </div>
+          <div class="track-dot" style="background:${t.color||'#1e3a8a'}"></div>
+          <div class="track-info">
+            <div class="track-name">${t.name||'Unnamed'}</div>
+            <div class="track-meta">${t.stations?.length||0} stations</div>
+          </div>
+        </div>
+      `).join('');
+      
+      // Add drag-and-drop event listeners
+      el.querySelectorAll('.track-item').forEach(item => {
+        item.addEventListener('dragstart', handleTrackDragStart);
+        item.addEventListener('dragend', handleTrackDragEnd);
+        item.addEventListener('dragover', handleTrackDragOver);
+        item.addEventListener('dragleave', handleTrackDragLeave);
+        item.addEventListener('drop', handleTrackDrop);
+      });
+    }
+    
+    let draggedTrackIdx = null;
+    
+    function handleTrackDragStart(e) {
+      draggedTrackIdx = parseInt(e.currentTarget.dataset.trackIdx);
+      e.currentTarget.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    }
+    
+    function handleTrackDragEnd(e) {
+      e.currentTarget.classList.remove('dragging');
+      document.querySelectorAll('.track-item').forEach(item => item.classList.remove('drag-over'));
+      draggedTrackIdx = null;
+    }
+    
+    function handleTrackDragOver(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      const item = e.currentTarget;
+      if (parseInt(item.dataset.trackIdx) !== draggedTrackIdx) {
+        item.classList.add('drag-over');
+      }
+    }
+    
+    function handleTrackDragLeave(e) {
+      e.currentTarget.classList.remove('drag-over');
+    }
+    
+    function handleTrackDrop(e) {
+      e.preventDefault();
+      const targetIdx = parseInt(e.currentTarget.dataset.trackIdx);
+      e.currentTarget.classList.remove('drag-over');
+      
+      if (draggedTrackIdx !== null && draggedTrackIdx !== targetIdx) {
+        // Reorder tracks
+        const tracks = state.data.tracks;
+        const [movedTrack] = tracks.splice(draggedTrackIdx, 1);
+        tracks.splice(targetIdx, 0, movedTrack);
+        
+        // Update crossings to reflect new track indices
+        state.data.crossings.forEach(c => {
+          c.fromTrack = updateTrackIndex(c.fromTrack, draggedTrackIdx, targetIdx);
+          c.toTrack = updateTrackIndex(c.toTrack, draggedTrackIdx, targetIdx);
+        });
+        
+        // Update selection if needed
+        if (state.selection?.type === 'track') {
+          state.selection.trackIdx = updateTrackIndex(state.selection.trackIdx, draggedTrackIdx, targetIdx);
+        } else if (state.selection?.type === 'station') {
+          state.selection.trackIdx = updateTrackIndex(state.selection.trackIdx, draggedTrackIdx, targetIdx);
+        }
+        
+        render();
+        toast('Track reordered');
+      }
+    }
+    
+    function updateTrackIndex(idx, fromIdx, toIdx) {
+      if (idx === fromIdx) return toIdx;
+      if (fromIdx < toIdx) {
+        if (idx > fromIdx && idx <= toIdx) return idx - 1;
+      } else {
+        if (idx >= toIdx && idx < fromIdx) return idx + 1;
+      }
+      return idx;
+    }
+    
+    function applySelection() {
+      document.querySelectorAll('#map-canvas .station').forEach(el => el.classList.remove('selected'));
+      if (state.selection?.type === 'station') {
+        const el = document.querySelector(`#map-canvas .station[data-track="${state.selection.trackIdx}"][data-station="${state.selection.stationIdx}"]`);
+        el?.classList.add('selected');
+      }
+    }
+    
+    function updateHint() {
+      const hints = {
+        select: 'Drag stations to reposition. Double-click to edit. Right-click for options.',
+        station: 'Click on a track line to add a station.',
+        crossing: state.crossingStart ? 'Click another station to complete the crossing.' : 'Click a station to start a crossing.'
+      };
+      document.getElementById('hint').textContent = hints[state.tool] || '';
+    }
+    
+    // =============================================
+    // Mouse Events
+    // =============================================
+    function onMouseDown(e) {
+      const station = e.target.closest('.station');
+      const trackHeader = e.target.closest('.track-header');
+      const crossingMarker = e.target.closest('.crossing-marker');
+      const trackLine = e.target.closest('.track-lines line');
+      
+      if (state.tool === 'select') {
+        if (station) {
+          const ti = +station.dataset.track, si = +station.dataset.station;
+          selectStation(ti, si);
+          startDrag(e, ti, si);
+        } else if (trackHeader) {
+          selectTrack(+trackHeader.dataset.track);
+        } else if (crossingMarker) {
+          selectCrossing(+crossingMarker.dataset.crossing);
+        } else {
+          clearSelection();
+        }
+      } else if (state.tool === 'station') {
+        if (trackLine) addStationOnTrack(e, trackLine);
+      } else if (state.tool === 'crossing') {
+        if (station) handleCrossingClick(+station.dataset.track, +station.dataset.station);
+      }
+    }
+    
+    function onMouseMove(e) {
+      if (state.drag) updateDrag(e);
+    }
+    
+    function onMouseUp(e) {
+      state.drag = null;
+      document.body.style.cursor = '';
+    }
+    
+    function onDblClick(e) {
+      const station = e.target.closest('.station');
+      const trackHeader = e.target.closest('.track-header');
+      const crossingMarker = e.target.closest('.crossing-marker');
+      
+      if (station) editStation(+station.dataset.track, +station.dataset.station);
+      else if (trackHeader) editTrack(+trackHeader.dataset.track);
+      else if (crossingMarker) editCrossing(+crossingMarker.dataset.crossing);
+    }
+    
+    function onContextMenu(e) {
+      e.preventDefault();
+      const station = e.target.closest('.station');
+      const crossingMarker = e.target.closest('.crossing-marker');
+      
+      if (station) {
+        selectStation(+station.dataset.track, +station.dataset.station);
+        showCtxMenu(e.clientX, e.clientY);
+      } else if (crossingMarker) {
+        selectCrossing(+crossingMarker.dataset.crossing);
+        showCtxMenu(e.clientX, e.clientY);
+      }
+    }
+    
+    // =============================================
+    // Drag & Drop
+    // =============================================
+    function startDrag(e, trackIdx, stationIdx) {
+      const svg = document.querySelector('#map-canvas svg');
+      const rect = svg.getBoundingClientRect();
+      const station = state.data.tracks[trackIdx].stations[stationIdx];
+      
+      state.drag = {
+        trackIdx, stationIdx,
+        startX: e.clientX, startY: e.clientY,
+        origOffset: station.positionOffset || 0
+      };
+      document.body.style.cursor = 'grabbing';
+    }
+    
+    function updateDrag(e) {
+      if (!state.drag) return;
+      const { trackIdx, stationIdx, startX, startY, origOffset } = state.drag;
+      const isH = state.config.orientation === 'horizontal';
+      // Account for zoom level when dragging
+      const delta = (isH ? (e.clientX - startX) : (e.clientY - startY)) / state.zoom;
+      
+      state.data.tracks[trackIdx].stations[stationIdx].positionOffset = origOffset + delta;
+      render();
+    }
+    
+    // =============================================
+    // Selection
+    // =============================================
+    function selectStation(ti, si) {
+      state.selection = { type: 'station', trackIdx: ti, stationIdx: si };
+      applySelection();
+      renderTrackList();
+    }
+    
+    function selectTrack(ti) {
+      state.selection = { type: 'track', trackIdx: ti };
+      applySelection();
+      renderTrackList();
+    }
+    
+    function selectCrossing(ci) {
+      state.selection = { type: 'crossing', crossingIdx: ci };
+      applySelection();
+    }
+    
+    function clearSelection() {
+      state.selection = null;
+      state.crossingStart = null;
+      applySelection();
+      renderTrackList();
+    }
+    
+    // =============================================
+    // Tools
+    // =============================================
+    function setTool(t) {
+      state.tool = t;
+      state.crossingStart = null;
+      document.querySelectorAll('.tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === t));
+      document.getElementById('map-canvas').style.cursor = t === 'select' ? '' : 'crosshair';
+      updateHint();
+    }
+    
+    function setOrientation(o) {
+      state.config.orientation = o;
+      document.querySelectorAll('.toggle-opt').forEach(b => b.classList.toggle('active', b.dataset.v === o));
+      map.resetCanvasSize();
+      render();
+    }
+    
+    function setSizeMode(mode) {
+      state.sizeMode = mode;
+      state.config.autoFit = (mode === 'auto');
+      document.querySelectorAll('.size-opt').forEach(b => b.classList.toggle('active', b.dataset.v === mode));
+      document.getElementById('manual-size-row').style.display = mode === 'manual' ? 'grid' : 'none';
+      document.getElementById('size-presets').style.display = mode === 'manual' ? 'flex' : 'none';
+      render();
+    }
+    
+    function setPresetSize(w, h) {
+      state.config.width = w;
+      state.config.height = h;
+      document.getElementById('inp-width').value = w;
+      document.getElementById('inp-height').value = h;
+      render();
+    }
+    
+    function updateSize() {
+      state.config.width = parseInt(document.getElementById('inp-width').value) || 800;
+      state.config.height = parseInt(document.getElementById('inp-height').value) || 600;
+      render();
+    }
+    
+    function toggleSection(titleEl) {
+      const section = titleEl.closest('.sidebar-section');
+      section.classList.toggle('collapsed');
+    }
+    
+    function setBgColor(color) {
+      state.config.backgroundColor = color;
+      document.getElementById('inp-bg-color').value = color;
+      document.querySelectorAll('#bg-colors .color-btn').forEach(b => {
+        b.classList.toggle('selected', b.dataset.c === color);
+      });
+      // Update canvas background to match
+      document.getElementById('canvas-wrap').style.setProperty('--canvas-bg', color);
+      render();
+    }
+    
+    // Global text settings
+    function adjustFontSize(delta) {
+      const valEl = document.getElementById('font-size-val');
+      let val = state.config.fontSizeAdjust || 0;
+      val += delta;
+      state.config.fontSizeAdjust = val;
+      // Display with +/- prefix
+      valEl.textContent = val > 0 ? `+${val}` : val;
+      render();
+    }
+    
+    function setGlobalTextColor(color) {
+      state.config.textColor = color;
+      render();
+    }
+    
+    function setGlobalTitleBg(color) {
+      state.config.titleBg = color;
+      render();
+    }
+    
+    function setGlobalTitleBorder(checked) {
+      state.config.titleBorder = checked;
+      document.getElementById('inp-title-border-color').style.display = checked ? 'block' : 'none';
+      render();
+    }
+    
+    function setGlobalTitleBorderColor(color) {
+      state.config.titleBorderColor = color;
+      render();
+    }
+    
+    function adjustTitlePadding(delta) {
+      const valEl = document.getElementById('title-padding-val');
+      let val = parseInt(valEl.textContent) || 12;
+      val = Math.max(4, Math.min(30, val + delta));
+      valEl.textContent = val;
+      state.config.titlePadding = val;
+      render();
+    }
+    
+    function adjustLabelOffset(delta) {
+      const valEl = document.getElementById('label-offset-val');
+      let val = parseInt(valEl.textContent) || 8;
+      val = Math.max(0, Math.min(30, val + delta));
+      valEl.textContent = val;
+      state.config.labelOffset = val;
+      render();
+    }
+    
+    // =============================================
+    // Add Elements
+    // =============================================
+    function addTrack() {
+      const idx = state.data.tracks.length;
+      state.data.tracks.push({
+        name: `Track ${idx + 1}`,
+        color: COLORS[idx % COLORS.length],
+        style: 'solid',
+        stations: [{ name: 'Station 1', status: 'default' }]
+      });
+      render();
+      toast('Track added');
+    }
+    
+    function addStationOnTrack(e, lineEl) {
+      // Find which track
+      const lines = document.querySelectorAll('#map-canvas .track-lines line');
+      let trackIdx = -1;
+      lines.forEach((l, i) => { if (l === lineEl) trackIdx = i; });
+      
+      if (trackIdx >= 0) {
+        const track = state.data.tracks[trackIdx];
+        if (!track.stations) track.stations = [];
+        track.stations.push({ name: `Station ${track.stations.length + 1}`, status: 'default' });
+        render();
+        toast('Station added');
+        setTool('select');
+      }
+    }
+    
+    function handleCrossingClick(ti, si) {
+      if (!state.crossingStart) {
+        state.crossingStart = { trackIdx: ti, stationIdx: si };
+        toast('Now click another station');
+        updateHint();
+      } else {
+        if (state.crossingStart.trackIdx !== ti) {
+          state.data.crossings.push({
+            fromTrack: state.crossingStart.trackIdx,
+            toTrack: ti,
+            fromStation: state.crossingStart.stationIdx,
+            toStation: si,
+            color: '#0891b2',
+            style: 'bezier',
+            curvature: 0.5
+          });
+          render();
+          toast('Crossing created');
+        }
+        state.crossingStart = null;
+        setTool('select');
+      }
+    }
+    
+    // =============================================
+    // Edit Modals
+    // =============================================
+    function editStation(ti, si) {
+      const s = state.data.tracks[ti].stations[si];
+      document.getElementById('sta-name').value = s.name || '';
+      document.getElementById('sta-date').value = s.date || '';
+      document.getElementById('sta-radius').value = s.radius || '';
+      
+      // Calculate current offset based on label position
+      const labelSide = s.labelSide || 'auto';
+      let currentOffset = 0;
+      if (labelSide === 'top' || labelSide === 'left') {
+        currentOffset = -(s.labelOffsetY || s.labelOffsetX || 0);
+      } else {
+        currentOffset = s.labelOffsetY || s.labelOffsetX || 0;
+      }
+      document.getElementById('sta-offset-val').textContent = currentOffset;
+      
+      document.querySelectorAll('#sta-status .status-pill').forEach(p => {
+        p.classList.toggle('selected', p.dataset.s === (s.status || 'default'));
+      });
+      document.querySelectorAll('#sta-label-pos .status-pill').forEach(p => {
+        p.classList.toggle('selected', p.dataset.p === labelSide);
+      });
+      state.selection = { type: 'station', trackIdx: ti, stationIdx: si };
+      openModal('station');
+    }
+    
+    function adjustStationOffset(delta) {
+      const valEl = document.getElementById('sta-offset-val');
+      let val = parseInt(valEl.textContent) || 0;
+      val = Math.max(-50, Math.min(50, val + delta));
+      valEl.textContent = val;
+    }
+    
+    function saveStation() {
+      if (state.selection?.type !== 'station') return;
+      const s = state.data.tracks[state.selection.trackIdx].stations[state.selection.stationIdx];
+      s.name = document.getElementById('sta-name').value;
+      s.date = document.getElementById('sta-date').value || undefined;
+      s.status = document.querySelector('#sta-status .status-pill.selected')?.dataset.s || 'default';
+      
+      const labelPos = document.querySelector('#sta-label-pos .status-pill.selected')?.dataset.p;
+      s.labelSide = labelPos === 'auto' ? undefined : labelPos;
+      
+      // Apply offset based on label position
+      const offset = parseInt(document.getElementById('sta-offset-val').textContent) || 0;
+      const side = s.labelSide || (state.config.orientation === 'horizontal' ? 'top' : 'right');
+      
+      // Reset both offsets
+      s.labelOffsetX = undefined;
+      s.labelOffsetY = undefined;
+      
+      // Apply offset in the appropriate direction
+      if (offset !== 0) {
+        if (side === 'top') s.labelOffsetY = -offset;
+        else if (side === 'bottom') s.labelOffsetY = offset;
+        else if (side === 'left') s.labelOffsetX = -offset;
+        else if (side === 'right') s.labelOffsetX = offset;
+      }
+      
+      const radius = parseInt(document.getElementById('sta-radius').value) || 0;
+      s.radius = radius || undefined;
+      
+      closeModal('station');
+      render();
+    }
+    
+    function editTrack(ti) {
+      const t = state.data.tracks[ti];
+      document.getElementById('trk-name').value = t.name || '';
+      document.getElementById('trk-desc').value = t.description || '';
+      document.getElementById('trk-style').value = t.style || 'solid';
+      document.getElementById('trk-line-width').value = t.lineWidth || '';
+      document.querySelectorAll('#trk-colors .color-btn').forEach(b => {
+        b.classList.toggle('selected', b.dataset.c === t.color);
+      });
+      state.selection = { type: 'track', trackIdx: ti };
+      openModal('track');
+    }
+    
+    function saveTrack() {
+      if (state.selection?.type !== 'track') return;
+      const t = state.data.tracks[state.selection.trackIdx];
+      t.name = document.getElementById('trk-name').value;
+      t.description = document.getElementById('trk-desc').value || undefined;
+      t.style = document.getElementById('trk-style').value;
+      t.color = document.querySelector('#trk-colors .color-btn.selected')?.dataset.c || '#1e3a8a';
+      
+      const lineWidth = parseInt(document.getElementById('trk-line-width').value) || 0;
+      t.lineWidth = lineWidth || undefined;
+      
+      closeModal('track');
+      render();
+    }
+    
+    function deleteTrack() {
+      if (state.selection?.type !== 'track') return;
+      if (!confirm('Delete this track and all stations?')) return;
+      const idx = state.selection.trackIdx;
+      state.data.tracks.splice(idx, 1);
+      state.data.crossings = state.data.crossings.filter(c => c.fromTrack !== idx && c.toTrack !== idx);
+      state.data.crossings.forEach(c => {
+        if (c.fromTrack > idx) c.fromTrack--;
+        if (c.toTrack > idx) c.toTrack--;
+      });
+      closeModal('track');
+      clearSelection();
+      render();
+      toast('Track deleted');
+    }
+    
+    function editCrossing(ci) {
+      const c = state.data.crossings[ci];
+      document.getElementById('cross-style').value = c.style || 'bezier';
+      document.getElementById('cross-marker').value = c.marker === false ? 'none' : (c.markerStyle || 'circle');
+      document.getElementById('cross-label').value = c.label || '';
+      const colorToSelect = c.gradient ? 'gradient' : (c.color || '#0891b2');
+      document.querySelectorAll('#cross-colors .color-btn').forEach(b => {
+        b.classList.toggle('selected', b.dataset.c === colorToSelect);
+      });
+      state.selection = { type: 'crossing', crossingIdx: ci };
+      openModal('crossing');
+    }
+    
+    function saveCrossing() {
+      if (state.selection?.type !== 'crossing') return;
+      const c = state.data.crossings[state.selection.crossingIdx];
+      c.style = document.getElementById('cross-style').value;
+      c.label = document.getElementById('cross-label').value || undefined;
+      const selectedColor = document.querySelector('#cross-colors .color-btn.selected')?.dataset.c || '#0891b2';
+      c.color = selectedColor;
+      c.gradient = selectedColor === 'gradient';
+      const marker = document.getElementById('cross-marker').value;
+      c.marker = marker !== 'none';
+      c.markerStyle = marker === 'none' ? undefined : marker;
+      closeModal('crossing');
+      render();
+    }
+    
+    function deleteCrossing() {
+      if (state.selection?.type !== 'crossing') return;
+      state.data.crossings.splice(state.selection.crossingIdx, 1);
+      closeModal('crossing');
+      clearSelection();
+      render();
+      toast('Crossing deleted');
+    }
+    
+    // =============================================
+    // Context Menu
+    // =============================================
+    function showCtxMenu(x, y) {
+      const m = document.getElementById('ctx-menu');
+      m.style.left = x + 'px';
+      m.style.top = y + 'px';
+      m.classList.add('show');
+    }
+    
+    function hideCtxMenu() {
+      document.getElementById('ctx-menu').classList.remove('show');
+    }
+    
+    function ctxEdit() {
+      hideCtxMenu();
+      if (state.selection?.type === 'station') editStation(state.selection.trackIdx, state.selection.stationIdx);
+      else if (state.selection?.type === 'crossing') editCrossing(state.selection.crossingIdx);
+    }
+    
+    function ctxDuplicate() {
+      hideCtxMenu();
+      if (state.selection?.type === 'station') {
+        const t = state.data.tracks[state.selection.trackIdx];
+        const copy = { ...t.stations[state.selection.stationIdx] };
+        copy.name += ' (copy)';
+        delete copy.positionOffset;
+        t.stations.splice(state.selection.stationIdx + 1, 0, copy);
+        render();
+        toast('Station duplicated');
+      }
+    }
+    
+    function ctxResetPos() {
+      hideCtxMenu();
+      if (state.selection?.type === 'station') {
+        delete state.data.tracks[state.selection.trackIdx].stations[state.selection.stationIdx].positionOffset;
+        render();
+        toast('Position reset');
+      }
+    }
+    
+    function ctxDelete() {
+      hideCtxMenu();
+      if (state.selection?.type === 'station') {
+        state.data.tracks[state.selection.trackIdx].stations.splice(state.selection.stationIdx, 1);
+        clearSelection();
+        render();
+        toast('Station deleted');
+      } else if (state.selection?.type === 'crossing') {
+        state.data.crossings.splice(state.selection.crossingIdx, 1);
+        clearSelection();
+        render();
+        toast('Crossing deleted');
+      }
+    }
+    
+    // =============================================
+    // Reset Positions
+    // =============================================
+    function resetAllPositions() {
+      state.data.tracks.forEach(t => {
+        t.stations?.forEach(s => delete s.positionOffset);
+      });
+      map.resetCanvasSize();
+      render();
+      toast('All positions reset');
+    }
+    
+    // =============================================
+    // Modal
+    // =============================================
+    function openModal(name) {
+      document.getElementById('modal-' + name).classList.add('show');
+    }
+    
+    function closeModal(name) {
+      document.getElementById('modal-' + name).classList.remove('show');
+    }
+    
+    // =============================================
+    // Toast
+    // =============================================
+    function toast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2000);
+    }
+    
+    // =============================================
+    // Zoom
+    // =============================================
+    function updateZoom() {
+      const mapCanvas = document.getElementById('map-canvas');
+      mapCanvas.style.transform = `scale(${state.zoom})`;
+      mapCanvas.style.transformOrigin = 'top left';
+      const pct = state.zoom * 100;
+      document.getElementById('zoom-label').textContent = pct < 10 ? pct.toFixed(1) + '%' : Math.round(pct) + '%';
+    }
+    
+    function zoomIn() {
+      state.zoom = Math.min(5, state.zoom * 1.2);
+      updateZoom();
+    }
+    
+    function zoomOut() {
+      state.zoom = Math.max(0.05, state.zoom / 1.2);
+      updateZoom();
+    }
+    
+    function zoomReset() {
+      state.zoom = 1;
+      updateZoom();
+    }
+    
+    // =============================================
+    // Floating Panel Drag
+    // =============================================
+    let panelDrag = null;
+    
+    function startDragPanel(e, panelId) {
+      const panel = document.getElementById(panelId);
+      const rect = panel.getBoundingClientRect();
+      
+      panelDrag = {
+        panel,
+        startX: e.clientX,
+        startY: e.clientY,
+        origLeft: rect.left,
+        origTop: rect.top
+      };
+      
+      document.addEventListener('mousemove', dragPanel);
+      document.addEventListener('mouseup', stopDragPanel);
+      e.preventDefault();
+    }
+    
+    function dragPanel(e) {
+      if (!panelDrag) return;
+      const dx = e.clientX - panelDrag.startX;
+      const dy = e.clientY - panelDrag.startY;
+      
+      panelDrag.panel.style.left = (panelDrag.origLeft + dx) + 'px';
+      panelDrag.panel.style.top = (panelDrag.origTop + dy) + 'px';
+      panelDrag.panel.style.right = 'auto';
+    }
+    
+    function stopDragPanel() {
+      panelDrag = null;
+      document.removeEventListener('mousemove', dragPanel);
+      document.removeEventListener('mouseup', stopDragPanel);
+    }
+    
+    function togglePanel(panelId) {
+      document.getElementById(panelId).classList.toggle('collapsed');
+    }
+    
+    // =============================================
+    // Import / Export
+    // =============================================
+    function importJSON(e) {
+      var input = e.target;
+      var files = input.files;
+      if (!files || !files[0]) return;
+      
+      var file = files[0];
+      var reader = new FileReader();
+      
+      reader.onload = function(ev) {
+        try {
+          var obj = JSON.parse(ev.target.result);
+          
+          // Import data (handle both formats: {data:...} and direct {tracks:...})
+          var src = obj.data || obj;
+          state.data = {
+            title: src.title || '',
+            tracks: src.tracks || [],
+            crossings: src.crossings || [],
+            phases: src.phases || [],
+            timeMarkers: src.timeMarkers || []
+          };
+          
+          // Import config if present
+          if (obj.config) {
+            // Merge imported config with defaults (preserving any missing values)
+            Object.assign(state.config, obj.config);
+          }
+          
+          // Update all UI elements to reflect imported settings
+          updateUIFromState();
+          
+          map.resetCanvasSize();
+          render();
+          toast('Imported!');
+        } catch (err) {
+          alert('Import error: ' + err.message);
+        }
+        input.value = '';
+      };
+      
+      reader.readAsText(file);
+    }
+    
+    function updateUIFromState() {
+      // Title
+      document.getElementById('inp-title').value = state.data.title || '';
+      
+      // Orientation
+      document.querySelectorAll('.toggle [data-v]').forEach(b => {
+        b.classList.toggle('active', b.dataset.v === state.config.orientation);
+      });
+      
+      // Size mode (auto vs manual)
+      const mode = state.config.autoFit !== false ? 'auto' : 'manual';
+      state.sizeMode = mode;
+      document.querySelectorAll('.size-toggle .size-opt').forEach(b => {
+        b.classList.toggle('active', b.dataset.v === mode);
+      });
+      const manualRow = document.getElementById('manual-size-row');
+      if (manualRow) manualRow.style.display = mode === 'manual' ? 'grid' : 'none';
+      
+      // Manual size inputs
+      const widthInput = document.getElementById('inp-width');
+      const heightInput = document.getElementById('inp-height');
+      if (widthInput) widthInput.value = state.config.width || 800;
+      if (heightInput) heightInput.value = state.config.height || 600;
+      
+      // Background color
+      document.querySelectorAll('#bg-colors .color-btn').forEach(b => {
+        b.classList.toggle('selected', b.dataset.c === state.config.backgroundColor);
+      });
+      document.getElementById('canvas-wrap').style.setProperty('--canvas-bg', state.config.backgroundColor || '#eff6ff');
+      
+      // Font size adjust (stepper display)
+      const fontSizeVal = state.config.fontSizeAdjust || 0;
+      const fontSizeDisplay = document.getElementById('font-size-val');
+      if (fontSizeDisplay) fontSizeDisplay.textContent = fontSizeVal > 0 ? `+${fontSizeVal}` : fontSizeVal;
+      
+      // Layout settings (input fields)
+      const trackGapInput = document.getElementById('inp-track-gap');
+      if (trackGapInput) trackGapInput.value = state.config.trackSpacing || 140;
+      
+      const stationGapInput = document.getElementById('inp-station-gap');
+      if (stationGapInput) stationGapInput.value = state.config.stationSpacing || 100;
+      
+      const lineWidthInput = document.getElementById('inp-line-width');
+      if (lineWidthInput) lineWidthInput.value = state.config.lineWidth || 6;
+      
+      const stationSizeInput = document.getElementById('inp-station-size');
+      if (stationSizeInput) stationSizeInput.value = state.config.stationRadius || 12;
+      
+      // Text styling
+      const textColorInput = document.getElementById('inp-text-color');
+      if (textColorInput) textColorInput.value = state.config.textColor || '#1e293b';
+      
+      const titleBgInput = document.getElementById('inp-title-bg');
+      if (titleBgInput) titleBgInput.value = state.config.titleBg || '#ffffff';
+      
+      // Title padding stepper
+      const titlePaddingDisplay = document.getElementById('title-padding-val');
+      if (titlePaddingDisplay) titlePaddingDisplay.textContent = state.config.titlePadding || 12;
+      
+      // Label offset stepper
+      const labelOffsetDisplay = document.getElementById('label-offset-val');
+      if (labelOffsetDisplay) labelOffsetDisplay.textContent = state.config.labelOffset || 8;
+      
+      // Show legend checkbox (if it exists in UI)
+      const legendCheckbox = document.getElementById('inp-show-legend');
+      if (legendCheckbox) legendCheckbox.checked = state.config.showLegend || false;
+      
+      // Title border checkbox and color
+      const titleBorderCheckbox = document.getElementById('inp-title-border');
+      if (titleBorderCheckbox) {
+        titleBorderCheckbox.checked = state.config.titleBorder !== false;
+        // Show/hide border color input based on checkbox
+        const borderColorInput = document.getElementById('inp-title-border-color');
+        if (borderColorInput) {
+          borderColorInput.style.display = titleBorderCheckbox.checked ? 'block' : 'none';
+          borderColorInput.value = state.config.titleBorderColor || '#e2e8f0';
+        }
+      }
+    }
+    
+    function exportJSON() {
+      // Create export config without colors (colors are theme-dependent)
+      const { colors, ...exportConfig } = state.config;
+      const blob = new Blob([JSON.stringify({ config: exportConfig, data: state.data }, null, 2)], { type: 'application/json' });
+      download(blob, (state.data.title || 'metro-map').replace(/[^a-z0-9]/gi, '-').toLowerCase() + '.json');
+    }
+    
+    function exportSVG() {
+      const blob = new Blob([map.toSVG()], { type: 'image/svg+xml' });
+      download(blob, (state.data.title || 'metro-map').replace(/[^a-z0-9]/gi, '-').toLowerCase() + '.svg');
+    }
+    
+    function download(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+    
+    // =============================================
+    // Example
+    // =============================================
+    function loadExample() {
+      state.data = {
+        title: 'Platform Modernization',
+        tracks: [
+          {
+            name: 'Backend',
+            description: 'APIs & Services',
+            color: '#1e3a8a',
+            style: 'solid',
+            stations: [
+              { name: 'API Design', date: 'Jan', status: 'completed' },
+              { name: 'Core Services', date: 'Mar', status: 'completed' },
+              { name: 'Integration', date: 'Jun', status: 'milestone' },
+              { name: 'Scale Out', date: 'Sep', status: 'future' }
+            ]
+          },
+          {
+            name: 'Frontend',
+            description: 'User Experience',
+            color: '#D63384',
+            style: 'solid',
+            stations: [
+              { name: 'Design System', date: 'Feb', status: 'completed' },
+              { name: 'Components', date: 'May', status: 'active' },
+              { name: 'Integration', date: 'Jun', status: 'milestone' },
+              { name: 'Launch', date: 'Oct', status: 'future' }
+            ]
+          }
+        ],
+        crossings: [{
+          fromTrack: 0, toTrack: 1,
+          fromStation: 2, toStation: 2,
+          color: 'gradient', style: 'metro-smooth', label: 'Sync'
+        }],
+        phases: [],
+        timeMarkers: []
+      };
+      document.getElementById('inp-title').value = state.data.title;
+      map.resetCanvasSize();
+      render();
+    }
+  </script>
+</body>
+</html>
