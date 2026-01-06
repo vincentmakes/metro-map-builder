@@ -2,7 +2,7 @@
 
 A parametric SVG library and a WYSIWYG builder for creating beautiful metro-style roadmap diagrams. Perfect for visualizing project timelines, product roadmaps, and strategic plans.
 
-![MetroMap Example](https://img.shields.io/badge/version-2.1-blue) ![License](https://img.shields.io/badge/license-MIT-green) [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/vincentmakes)  
+![MetroMap Example](https://img.shields.io/badge/version-2.1-blue) ![License](https://img.shields.io/badge/license-MIT-green) 
 
 <img width="1000" alt="example" src="https://github.com/user-attachments/assets/03d9e677-02dc-461e-a281-5b9ce729a26b" />
 
@@ -585,5 +585,5 @@ img.src = url;
 MIT License - feel free to use in personal and commercial projects.
 
 ## Credits
-
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/vincentmakes)  
 Created for the [Architecting Tomorrow](https://architecting.verdet.me) blog by Vincent Verdet.
