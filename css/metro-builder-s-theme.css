@@ -689,3 +689,35 @@ body {
 }
 .theme-select:focus { outline: none; border-color: rgba(255,255,255,0.5); }
 .theme-select option { color: #333; background: white; }
+
+/* ============================================= */
+/* Save Status Indicator */
+/* ============================================= */
+
+.save-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--theme-muted);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s;
+}
+
+.save-status.saving {
+  color: var(--theme-accent);
+}
+
+.save-status.saved {
+  color: var(--theme-success);
+}
+
+.save-status.error {
+  color: var(--theme-danger);
+}
+
+.save-status svg {
+  width: 14px;
+  height: 14px;
+}
