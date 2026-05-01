@@ -1146,17 +1146,18 @@
       document.body.style.cursor = '';
     }
 
-    // Drag a station label to reposition it independently.
-    // Constrained to the axis perpendicular to the track, so the label
-    // stays aligned with its station along the track axis.
+    // Drag a station label to reposition all labels on its track together.
+    // Constrained to the axis perpendicular to the track so labels stay
+    // aligned with their stations along the track axis. Each station's
+    // pre-drag offset is captured so relative differences are preserved.
     function startLabelDrag(e, trackIdx, stationIdx) {
-      const station = state.data.tracks[trackIdx].stations[stationIdx];
       const isH = state.config.orientation === 'horizontal';
+      const stations = state.data.tracks[trackIdx].stations || [];
+      const origPerps = stations.map(s => isH ? (s.labelOffsetY || 0) : (s.labelOffsetX || 0));
       state.labelDrag = {
         trackIdx, stationIdx,
         startX: e.clientX, startY: e.clientY,
-        // Only the perpendicular axis is editable; the parallel axis is reset.
-        origPerpendicular: isH ? (station.labelOffsetY || 0) : (station.labelOffsetX || 0),
+        origPerps,
         snapshot: snapshotData(),
         moved: false
       };
@@ -1170,15 +1171,17 @@
       const delta = isH ? (e.clientY - d.startY) : (e.clientX - d.startX);
       const scaledDelta = Math.round(delta / state.zoom);
       if (Math.abs(scaledDelta) >= 1) d.moved = true;
-      const station = state.data.tracks[d.trackIdx].stations[d.stationIdx];
-      const next = d.origPerpendicular + scaledDelta;
-      if (isH) {
-        station.labelOffsetY = next || undefined;
-        station.labelOffsetX = undefined;
-      } else {
-        station.labelOffsetX = next || undefined;
-        station.labelOffsetY = undefined;
-      }
+      const stations = state.data.tracks[d.trackIdx].stations || [];
+      stations.forEach((s, i) => {
+        const next = (d.origPerps[i] || 0) + scaledDelta;
+        if (isH) {
+          s.labelOffsetY = next || undefined;
+          s.labelOffsetX = undefined;
+        } else {
+          s.labelOffsetX = next || undefined;
+          s.labelOffsetY = undefined;
+        }
+      });
       suppressHistory = true;
       render();
       suppressHistory = false;
