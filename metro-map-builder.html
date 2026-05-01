@@ -1146,29 +1146,39 @@
       document.body.style.cursor = '';
     }
 
-    // Drag a station label to reposition it independently
+    // Drag a station label to reposition it independently.
+    // Constrained to the axis perpendicular to the track, so the label
+    // stays aligned with its station along the track axis.
     function startLabelDrag(e, trackIdx, stationIdx) {
       const station = state.data.tracks[trackIdx].stations[stationIdx];
+      const isH = state.config.orientation === 'horizontal';
       state.labelDrag = {
         trackIdx, stationIdx,
         startX: e.clientX, startY: e.clientY,
-        origX: station.labelOffsetX || 0,
-        origY: station.labelOffsetY || 0,
+        // Only the perpendicular axis is editable; the parallel axis is reset.
+        origPerpendicular: isH ? (station.labelOffsetY || 0) : (station.labelOffsetX || 0),
         snapshot: snapshotData(),
         moved: false
       };
-      document.body.style.cursor = 'grabbing';
+      document.body.style.cursor = isH ? 'ns-resize' : 'ew-resize';
     }
 
     function updateLabelDrag(e) {
       const d = state.labelDrag;
       if (!d) return;
-      const dx = (e.clientX - d.startX) / state.zoom;
-      const dy = (e.clientY - d.startY) / state.zoom;
-      if (Math.abs(dx) > 1 || Math.abs(dy) > 1) d.moved = true;
+      const isH = state.config.orientation === 'horizontal';
+      const delta = isH ? (e.clientY - d.startY) : (e.clientX - d.startX);
+      const scaledDelta = Math.round(delta / state.zoom);
+      if (Math.abs(scaledDelta) >= 1) d.moved = true;
       const station = state.data.tracks[d.trackIdx].stations[d.stationIdx];
-      station.labelOffsetX = d.origX + dx;
-      station.labelOffsetY = d.origY + dy;
+      const next = d.origPerpendicular + scaledDelta;
+      if (isH) {
+        station.labelOffsetY = next || undefined;
+        station.labelOffsetX = undefined;
+      } else {
+        station.labelOffsetX = next || undefined;
+        station.labelOffsetY = undefined;
+      }
       suppressHistory = true;
       render();
       suppressHistory = false;
@@ -1822,8 +1832,8 @@
         applyStationLabelOffset(s, val);
         render();
       }
-      stepDown.addEventListener('click', () => adjustOffset(-5));
-      stepUp.addEventListener('click', () => adjustOffset(5));
+      stepDown.addEventListener('click', e => adjustOffset(e.shiftKey ? -10 : -1));
+      stepUp.addEventListener('click', e => adjustOffset(e.shiftKey ? 10 : 1));
 
       document.querySelector('#inspector-body [data-act="duplicate"]').addEventListener('click', ctxDuplicate);
       document.querySelector('#inspector-body [data-act="reset-pos"]').addEventListener('click', ctxResetPos);
