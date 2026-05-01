@@ -230,7 +230,7 @@
       <!-- Metro Map SVG -->
       <div id="map-canvas"></div>
       
-      <div class="hint-bar" id="hint">Double-click a track line to add a station · Drag stations to reposition · Press ? for shortcuts</div>
+      <div class="hint-bar" id="hint">Double-click a track line to add a station · Drag stations or labels to reposition · Press ? for shortcuts</div>
     </main>
 
     <!-- Inspector Panel -->
@@ -266,7 +266,7 @@
       <div class="help-row"><kbd>0</kbd><span>Reset zoom</span></div>
       <div class="help-sep"></div>
       <div class="help-row"><span class="help-tip">Double-click a track line to add a station</span></div>
-      <div class="help-row"><span class="help-tip">Double-click a label to rename inline</span></div>
+      <div class="help-row"><span class="help-tip">Drag a station label to reposition it freely</span></div>
       <div class="help-row"><span class="help-tip">Shift-drag from one station to another to create a crossing</span></div>
       <div class="help-row"><span class="help-tip">Right-click empty canvas for quick actions</span></div>
     </div>
@@ -1079,7 +1079,7 @@
       } else if (state.selection) {
         hint.textContent = 'Edit in the Inspector · Press D to duplicate, Del to delete, Esc to deselect';
       } else {
-        hint.textContent = 'Double-click a track line to add a station · Drag stations to reposition · Press ? for shortcuts';
+        hint.textContent = 'Double-click a track line to add a station · Drag stations or labels to reposition · Press ? for shortcuts';
       }
     }
 
@@ -1087,9 +1087,19 @@
     // Mouse Events
     // =============================================
     function onMouseDown(e) {
+      const label = e.target.closest('.station-label');
       const station = e.target.closest('.station');
       const trackHeader = e.target.closest('.track-header');
       const crossingMarker = e.target.closest('.crossing-marker');
+
+      if (label && label.dataset.track !== '' && !e.shiftKey) {
+        // Drag the label only — don't move the station
+        const ti = +label.dataset.track, si = +label.dataset.station;
+        selectStation(ti, si);
+        startLabelDrag(e, ti, si);
+        e.preventDefault();
+        return;
+      }
 
       if (station) {
         const ti = +station.dataset.track, si = +station.dataset.station;
@@ -1112,6 +1122,7 @@
     function onMouseMove(e) {
       if (state.drag) updateDrag(e);
       if (state.linkDrag) updateLinkDrag(e);
+      if (state.labelDrag) updateLabelDrag(e);
     }
 
     function onMouseUp(e) {
@@ -1122,9 +1133,45 @@
         editHistory.future.length = 0;
         updateHistoryButtons();
       }
+      if (state.labelDrag && state.labelDrag.snapshot && state.labelDrag.moved) {
+        editHistory.past.push(state.labelDrag.snapshot);
+        if (editHistory.past.length > HISTORY_LIMIT) editHistory.past.shift();
+        editHistory.future.length = 0;
+        updateHistoryButtons();
+        renderInspector();
+      }
       state.drag = null;
+      state.labelDrag = null;
       if (state.linkDrag) endLinkDrag(e);
       document.body.style.cursor = '';
+    }
+
+    // Drag a station label to reposition it independently
+    function startLabelDrag(e, trackIdx, stationIdx) {
+      const station = state.data.tracks[trackIdx].stations[stationIdx];
+      state.labelDrag = {
+        trackIdx, stationIdx,
+        startX: e.clientX, startY: e.clientY,
+        origX: station.labelOffsetX || 0,
+        origY: station.labelOffsetY || 0,
+        snapshot: snapshotData(),
+        moved: false
+      };
+      document.body.style.cursor = 'grabbing';
+    }
+
+    function updateLabelDrag(e) {
+      const d = state.labelDrag;
+      if (!d) return;
+      const dx = (e.clientX - d.startX) / state.zoom;
+      const dy = (e.clientY - d.startY) / state.zoom;
+      if (Math.abs(dx) > 1 || Math.abs(dy) > 1) d.moved = true;
+      const station = state.data.tracks[d.trackIdx].stations[d.stationIdx];
+      station.labelOffsetX = d.origX + dx;
+      station.labelOffsetY = d.origY + dy;
+      suppressHistory = true;
+      render();
+      suppressHistory = false;
     }
 
     function onDblClick(e) {
@@ -1964,7 +2011,11 @@
         pushHistory();
         const s = state.data.tracks[state.selection.trackIdx].stations[state.selection.stationIdx];
         delete s.positionOffset;
+        delete s.labelOffsetX;
+        delete s.labelOffsetY;
+        delete s.labelSide;
         render();
+        renderInspector();
         toast('Position reset');
       }
     }
@@ -2491,6 +2542,16 @@
     }
     #map-canvas .crossing-marker.selected {
       filter: drop-shadow(0 0 6px var(--theme-highlight, #ec4899));
+    }
+
+    /* Station labels are draggable */
+    #map-canvas .station-label {
+      cursor: move;
+    }
+    #map-canvas .station-label:hover text {
+      paint-order: stroke;
+      stroke: var(--theme-highlight, #ec4899);
+      stroke-width: 0.5px;
     }
   </style>
 </body>

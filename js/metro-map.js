@@ -681,9 +681,23 @@ class MetroMap {
     
     this.data.tracks.forEach((track, trackIdx) => {
       const color = track.color || this.getColor('primary');
-      const labelSide = track.labelSide || (this.isHorizontal() 
-        ? (trackIdx % 2 === 0 ? 'top' : 'bottom')
-        : (trackIdx % 2 === 0 ? 'right' : 'left'));
+      // Default sides: in horizontal mode, alternate top/bottom per track.
+      // In vertical mode, push outermost tracks outward to avoid the inner
+      // gap collision common to 2-track layouts.
+      const trackCount = this.data.tracks.length;
+      let defaultSide;
+      if (this.isHorizontal()) {
+        defaultSide = trackIdx % 2 === 0 ? 'top' : 'bottom';
+      } else if (trackCount <= 2) {
+        defaultSide = trackIdx === 0 ? 'left' : 'right';
+      } else if (trackIdx === 0) {
+        defaultSide = 'left';
+      } else if (trackIdx === trackCount - 1) {
+        defaultSide = 'right';
+      } else {
+        defaultSide = trackIdx % 2 === 0 ? 'right' : 'left';
+      }
+      const labelSide = track.labelSide || defaultSide;
       
       (track.stations || []).forEach((station, stationIdx) => {
         const coords = this.getStationCoords(trackIdx, stationIdx, station);
@@ -755,11 +769,11 @@ class MetroMap {
       }));
     }
 
-    this.renderStationLabel(stationGroup, station, x, y, labelSide, radius);
+    this.renderStationLabel(stationGroup, station, x, y, labelSide, radius, trackIdx, stationIdx);
     group.appendChild(stationGroup);
   }
 
-  renderStationLabel(group, station, x, y, defaultSide, radius) {
+  renderStationLabel(group, station, x, y, defaultSide, radius, trackIdx, stationIdx) {
     const { text, labelOffset, labelRotation, fontSizeAdjust, textColor } = this.config;
     const offset = radius + labelOffset;
     const sizeAdj = fontSizeAdjust || 0;
@@ -799,7 +813,11 @@ class MetroMap {
     const dateSize = text.stationDate.size + sizeAdj;
     const descSize = text.stationDesc.size + sizeAdj;
 
-    const labelGroup = this.createSVG('g');
+    const labelGroup = this.createSVG('g', {
+      class: 'station-label',
+      'data-track': trackIdx != null ? trackIdx : '',
+      'data-station': stationIdx != null ? stationIdx : ''
+    });
     if (rotation !== 0 && this.isHorizontal()) {
       labelGroup.setAttribute('transform', `rotate(${rotation} ${labelX} ${labelY})`);
     }
