@@ -50,8 +50,8 @@
         <div class="form-group">
           <label class="form-label">Orientation</label>
           <div class="toggle">
-            <button class="toggle-opt active" data-v="vertical" onclick="setOrientation('vertical')">Vertical</button>
-            <button class="toggle-opt" data-v="horizontal" onclick="setOrientation('horizontal')">Horizontal</button>
+            <button class="toggle-opt" data-v="vertical" onclick="setOrientation('vertical')">Vertical</button>
+            <button class="toggle-opt active" data-v="horizontal" onclick="setOrientation('horizontal')">Horizontal</button>
           </div>
         </div>
       </div>
@@ -193,17 +193,16 @@
     
     <!-- Toolbar Row -->
     <div class="toolbar-row">
-      <button class="tool-btn active" data-tool="select" onclick="setTool('select')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/></svg>
-        Select
+      <button class="tool-btn" id="undo-btn" onclick="undo()" title="Undo (Ctrl/Cmd+Z)" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/></svg>
       </button>
-      <button class="tool-btn" data-tool="station" onclick="setTool('station')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-        Station
+      <button class="tool-btn" id="redo-btn" onclick="redo()" title="Redo (Ctrl/Cmd+Shift+Z)" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 15-6.7L21 13"/></svg>
       </button>
-      <button class="tool-btn" data-tool="crossing" onclick="setTool('crossing')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
-        Crossing
+      <div class="tool-sep"></div>
+      <button class="tool-btn" onclick="addTrack()" title="New track (N)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add Track
       </button>
       <div class="tool-sep"></div>
       <button class="tool-btn" onclick="zoomOut()" title="Zoom Out (-)">
@@ -216,6 +215,9 @@
       <button class="tool-btn" onclick="zoomReset()" title="Reset to 100%">100%</button>
       <div class="tool-sep"></div>
       <button class="tool-btn" onclick="loadExample()">Example</button>
+      <button class="tool-btn" onclick="toggleHelp()" title="Keyboard shortcuts (?)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </button>
       <div class="tool-sep"></div>
       <span class="save-status" id="save-status" title="Auto-saved to browser storage">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
@@ -228,12 +230,50 @@
       <!-- Metro Map SVG -->
       <div id="map-canvas"></div>
       
-      <div class="hint-bar" id="hint">Drag stations to reposition. Double-click to edit. Right-click for options.</div>
+      <div class="hint-bar" id="hint">Double-click a track line to add a station · Drag stations or labels to reposition · Press ? for shortcuts</div>
     </main>
+
+    <!-- Inspector Panel -->
+    <aside class="inspector" id="inspector">
+      <div class="inspector-head">
+        <span class="inspector-title" id="inspector-title">Inspector</span>
+        <button class="inspector-close" onclick="closeInspector()" title="Close (Esc)">&times;</button>
+      </div>
+      <div class="inspector-body" id="inspector-body">
+        <div class="inspector-empty">
+          Select a station, track, or crossing on the canvas to edit it.
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Help / Cheat-sheet Popover -->
+  <div class="help-popover" id="help-popover">
+    <div class="help-head">
+      <span>Keyboard Shortcuts</span>
+      <button class="panel-close" onclick="toggleHelp()"></button>
+    </div>
+    <div class="help-body">
+      <div class="help-row"><kbd>?</kbd><span>Toggle this help</span></div>
+      <div class="help-row"><kbd>N</kbd><span>New track</span></div>
+      <div class="help-row"><kbd>D</kbd><span>Duplicate selection</span></div>
+      <div class="help-row"><kbd>Del</kbd><span>Delete selection</span></div>
+      <div class="help-row"><kbd>Esc</kbd><span>Clear selection / close</span></div>
+      <div class="help-row"><kbd>Enter</kbd><span>Rename selection</span></div>
+      <div class="help-row"><kbd>Ctrl/⌘+Z</kbd><span>Undo</span></div>
+      <div class="help-row"><kbd>Ctrl/⌘+Shift+Z</kbd><span>Redo</span></div>
+      <div class="help-row"><kbd>+</kbd> / <kbd>-</kbd><span>Zoom in / out</span></div>
+      <div class="help-row"><kbd>0</kbd><span>Reset zoom</span></div>
+      <div class="help-sep"></div>
+      <div class="help-row"><span class="help-tip">Double-click a track line to add a station</span></div>
+      <div class="help-row"><span class="help-tip">Drag a station label to reposition it freely</span></div>
+      <div class="help-row"><span class="help-tip">Shift-drag from one station to another to create a crossing</span></div>
+      <div class="help-row"><span class="help-tip">Right-click empty canvas for quick actions</span></div>
+    </div>
   </div>
   
   <!-- Floating Legend (outside grid for fixed positioning) -->
-  <div class="floating-panel" id="legend-panel" style="right: 20px; top: 120px;">
+  <div class="floating-panel" id="legend-panel" style="right: 320px; top: 80px;">
     <div class="panel-header" onmousedown="startDragPanel(event, 'legend-panel')">
       <span>Legend</span>
       <button class="panel-close" onclick="togglePanel('legend-panel')"></button>
@@ -249,157 +289,13 @@
   
   <!-- Context Menu -->
   <div class="ctx-menu" id="ctx-menu">
-    <div class="ctx-item" onclick="ctxEdit()">Edit</div>
-    <div class="ctx-item" onclick="ctxDuplicate()">Duplicate</div>
-    <div class="ctx-item" onclick="ctxResetPos()">Reset Position</div>
-    <div class="ctx-sep"></div>
-    <div class="ctx-item danger" onclick="ctxDelete()">Delete</div>
-  </div>
-  
-  <!-- Station Modal -->
-  <div class="modal-bg" id="modal-station">
-    <div class="modal">
-      <div class="modal-head">
-        <h3>Edit Station</h3>
-        <button class="btn btn-sm btn-secondary" onclick="closeModal('station')">&times;</button>
-      </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label class="form-label">Name</label>
-          <input type="text" class="form-input" id="sta-name">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Date / Label</label>
-          <input type="text" class="form-input" id="sta-date" placeholder="Q1 2024">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Status</label>
-          <div class="status-pills" id="sta-status">
-            <span class="status-pill default selected" data-s="default">Default</span>
-            <span class="status-pill completed" data-s="completed">Done</span>
-            <span class="status-pill active" data-s="active">Active</span>
-            <span class="status-pill milestone" data-s="milestone">Milestone</span>
-            <span class="status-pill future" data-s="future">Future</span>
-          </div>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Label Position</label>
-          <div class="status-pills" id="sta-label-pos">
-            <span class="status-pill default selected" data-p="auto">Auto</span>
-            <span class="status-pill default" data-p="top">Top</span>
-            <span class="status-pill default" data-p="bottom">Bottom</span>
-            <span class="status-pill default" data-p="left">Left</span>
-            <span class="status-pill default" data-p="right">Right</span>
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Label Offset</label>
-            <div class="stepper">
-              <button class="stepper-btn" onclick="adjustStationOffset(-5)">−</button>
-              <span class="stepper-val" id="sta-offset-val">0</span>
-              <button class="stepper-btn" onclick="adjustStationOffset(5)">+</button>
-            </div>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Station Size</label>
-            <input type="number" class="form-input" id="sta-radius" placeholder="Default" min="6" max="30">
-          </div>
-        </div>
-      </div>
-      <div class="modal-foot">
-        <button class="btn btn-secondary" onclick="closeModal('station')">Cancel</button>
-        <button class="btn btn-primary" onclick="saveStation()">Save</button>
-      </div>
-    </div>
-  </div>
-  
-  <!-- Track Modal -->
-  <div class="modal-bg" id="modal-track">
-    <div class="modal">
-      <div class="modal-head">
-        <h3>Edit Track</h3>
-        <button class="btn btn-sm btn-secondary" onclick="closeModal('track')">&times;</button>
-      </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label class="form-label">Name</label>
-          <input type="text" class="form-input" id="trk-name">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Description</label>
-          <input type="text" class="form-input" id="trk-desc" placeholder="Optional subtitle">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Color</label>
-          <div class="colors" id="trk-colors"></div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Style</label>
-            <select class="form-select" id="trk-style">
-              <option value="solid">Solid</option>
-              <option value="gradient">Gradient</option>
-              <option value="dashed">Dashed</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Line Width</label>
-            <input type="number" class="form-input" id="trk-line-width" placeholder="Default" min="2" max="16">
-          </div>
-        </div>
-      </div>
-      <div class="modal-foot">
-        <button class="btn btn-danger" onclick="deleteTrack()" style="margin-right:auto">Delete</button>
-        <button class="btn btn-secondary" onclick="closeModal('track')">Cancel</button>
-        <button class="btn btn-primary" onclick="saveTrack()">Save</button>
-      </div>
-    </div>
-  </div>
-  
-  <!-- Crossing Modal -->
-  <div class="modal-bg" id="modal-crossing">
-    <div class="modal">
-      <div class="modal-head">
-        <h3>Edit Crossing</h3>
-        <button class="btn btn-sm btn-secondary" onclick="closeModal('crossing')">&times;</button>
-      </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label class="form-label">Color</label>
-          <div class="colors" id="cross-colors"></div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Style</label>
-            <select class="form-select" id="cross-style">
-              <option value="bezier">Bezier</option>
-              <option value="metro">Metro 45°</option>
-              <option value="metro-smooth">Metro Smooth</option>
-              <option value="straight">Straight</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Marker</label>
-            <select class="form-select" id="cross-marker">
-              <option value="circle">Circle</option>
-              <option value="diamond">Diamond</option>
-              <option value="dot">Dot</option>
-              <option value="none">None</option>
-            </select>
-          </div>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Label</label>
-          <input type="text" class="form-input" id="cross-label" placeholder="Integration Point">
-        </div>
-      </div>
-      <div class="modal-foot">
-        <button class="btn btn-danger" onclick="deleteCrossing()" style="margin-right:auto">Delete</button>
-        <button class="btn btn-secondary" onclick="closeModal('crossing')">Cancel</button>
-        <button class="btn btn-primary" onclick="saveCrossing()">Save</button>
-      </div>
-    </div>
+    <div class="ctx-item" data-show-for="station,track,crossing" onclick="ctxEdit()">Rename / Edit</div>
+    <div class="ctx-item" data-show-for="station,track" onclick="ctxDuplicate()">Duplicate</div>
+    <div class="ctx-item" data-show-for="station" onclick="ctxResetPos()">Reset Position</div>
+    <div class="ctx-item" data-show-for="trackLine" onclick="ctxAddStationHere()">+ Add station here</div>
+    <div class="ctx-item" data-show-for="canvas" onclick="ctxAddTrack()">+ Add new track</div>
+    <div class="ctx-sep" data-show-for="station,track,crossing"></div>
+    <div class="ctx-item danger" data-show-for="station,track,crossing" onclick="ctxDelete()">Delete</div>
   </div>
   
   <div class="toast" id="toast"></div>
@@ -416,7 +312,7 @@
     
     const state = {
       config: { 
-        orientation: 'vertical', 
+        orientation: 'horizontal',
         trackSpacing: 140, 
         stationSpacing: 100, 
         lineWidth: 6, 
@@ -451,6 +347,85 @@
     let map = null;
     let currentTheme = 'default';
     let saveTimeout = null;
+
+    // =============================================
+    // Undo / Redo History
+    // =============================================
+    const HISTORY_LIMIT = 50;
+    let editHistory = { past: [], future: [] };
+    let suppressHistory = false;
+
+    function snapshotData() {
+      return JSON.stringify(state.data);
+    }
+
+    function pushHistory() {
+      if (suppressHistory) return;
+      editHistory.past.push(snapshotData());
+      if (editHistory.past.length > HISTORY_LIMIT) editHistory.past.shift();
+      editHistory.future.length = 0;
+      updateHistoryButtons();
+    }
+
+    function applySnapshot(snap) {
+      const restored = JSON.parse(snap);
+      state.data = {
+        title: restored.title || '',
+        tracks: restored.tracks || [],
+        crossings: restored.crossings || [],
+        phases: restored.phases || [],
+        timeMarkers: restored.timeMarkers || []
+      };
+      // Selection may now point at indices that no longer exist
+      if (state.selection) {
+        const sel = state.selection;
+        const tracks = state.data.tracks;
+        if (sel.type === 'station') {
+          if (!tracks[sel.trackIdx] || !tracks[sel.trackIdx].stations?.[sel.stationIdx]) {
+            state.selection = null;
+          }
+        } else if (sel.type === 'track' && !tracks[sel.trackIdx]) {
+          state.selection = null;
+        } else if (sel.type === 'crossing' && !state.data.crossings[sel.crossingIdx]) {
+          state.selection = null;
+        }
+      }
+      const titleInput = document.getElementById('inp-title');
+      if (titleInput) titleInput.value = state.data.title || '';
+    }
+
+    function undo() {
+      if (editHistory.past.length === 0) { toast('Nothing to undo'); return; }
+      editHistory.future.push(snapshotData());
+      const prev = editHistory.past.pop();
+      suppressHistory = true;
+      applySnapshot(prev);
+      suppressHistory = false;
+      render();
+      renderInspector();
+      updateHistoryButtons();
+      toast('Undo');
+    }
+
+    function redo() {
+      if (editHistory.future.length === 0) { toast('Nothing to redo'); return; }
+      editHistory.past.push(snapshotData());
+      const next = editHistory.future.pop();
+      suppressHistory = true;
+      applySnapshot(next);
+      suppressHistory = false;
+      render();
+      renderInspector();
+      updateHistoryButtons();
+      toast('Redo');
+    }
+
+    function updateHistoryButtons() {
+      const undoBtn = document.getElementById('undo-btn');
+      const redoBtn = document.getElementById('redo-btn');
+      if (undoBtn) undoBtn.disabled = editHistory.past.length === 0;
+      if (redoBtn) redoBtn.disabled = editHistory.future.length === 0;
+    }
     
     // =============================================
     // URL & LocalStorage Persistence
@@ -805,7 +780,9 @@
       }
       
       loadSavedTheme();
-      
+      renderInspector();
+      updateHistoryButtons();
+
       // Setup import handler
       document.getElementById('import-input').addEventListener('change', importJSON);
       
@@ -823,37 +800,22 @@
     });
     
     function setupColorPickers() {
-      const trkColors = document.getElementById('trk-colors');
-      const crossColors = document.getElementById('cross-colors');
       const bgColors = document.getElementById('bg-colors');
-      
-      // Clear existing color buttons
-      trkColors.innerHTML = '';
-      crossColors.innerHTML = '';
       bgColors.innerHTML = '';
-      
-      COLORS.forEach(c => {
-        trkColors.innerHTML += `<div class="color-btn" style="background:${c}" data-c="${c}"></div>`;
-        crossColors.innerHTML += `<div class="color-btn" style="background:${c}" data-c="${c}"></div>`;
-      });
-      
-      // Add gradient option for crossings
-      const gradientColors = currentTheme === 's-theme' 
-        ? 'linear-gradient(135deg, #003DA5 0%, #002EFF 100%)'
-        : 'linear-gradient(135deg, #1e3a8a 0%, #D63384 100%)';
-      crossColors.innerHTML += `<div class="color-btn gradient-btn" style="background:${gradientColors}" data-c="gradient" title="Gradient from track colors"></div>`;
-      
       BG_COLORS.forEach(c => {
         const border = c === '#ffffff' || c === '#FFFFFF' ? '1px solid #e2e8f0' : 'none';
         bgColors.innerHTML += `<div class="color-btn" style="background:${c};border:${border}" data-c="${c}"></div>`;
       });
-      
-      // Background color picker click handler
       bgColors.onclick = e => {
         if (e.target.classList.contains('color-btn')) {
           setBgColor(e.target.dataset.c);
         }
       };
+      // Inspector re-renders pull from COLORS at render time, so re-render
+      // its color rows if the active selection is a track or crossing.
+      if (state.selection?.type === 'track' || state.selection?.type === 'crossing') {
+        renderInspector();
+      }
     }
     
     function setupEvents() {
@@ -878,44 +840,45 @@
       });
       
       document.addEventListener('keydown', e => {
-        if (e.target.tagName === 'INPUT') return;
-        if (e.key === 'Delete' || e.key === 'Backspace') ctxDelete();
-        if (e.key === 'Escape') { clearSelection(); setTool('select'); }
-        if (e.key === '+' || e.key === '=') { e.preventDefault(); zoomIn(); }
-        if (e.key === '-' || e.key === '_') { e.preventDefault(); zoomOut(); }
-        if (e.key === '0') { e.preventDefault(); zoomReset(); }
-      });
-      
-      // Status pills
-      document.querySelectorAll('#sta-status .status-pill').forEach(p => {
-        p.onclick = () => {
-          document.querySelectorAll('#sta-status .status-pill').forEach(x => x.classList.remove('selected'));
-          p.classList.add('selected');
-        };
-      });
-      
-      // Label position pills
-      document.querySelectorAll('#sta-label-pos .status-pill').forEach(p => {
-        p.onclick = () => {
-          document.querySelectorAll('#sta-label-pos .status-pill').forEach(x => x.classList.remove('selected'));
-          p.classList.add('selected');
-        };
-      });
-      
-      // Color pickers
-      document.getElementById('trk-colors').onclick = e => {
-        if (e.target.classList.contains('color-btn')) {
-          document.querySelectorAll('#trk-colors .color-btn').forEach(x => x.classList.remove('selected'));
-          e.target.classList.add('selected');
+        const inField = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT';
+
+        // Undo / redo work even from inputs
+        if ((e.metaKey || e.ctrlKey) && (e.key === 'z' || e.key === 'Z')) {
+          e.preventDefault();
+          if (e.shiftKey) redo(); else undo();
+          return;
         }
-      };
-      document.getElementById('cross-colors').onclick = e => {
-        const btn = e.target.closest('.color-btn');
-        if (btn) {
-          document.querySelectorAll('#cross-colors .color-btn').forEach(x => x.classList.remove('selected'));
-          btn.classList.add('selected');
+        if ((e.metaKey || e.ctrlKey) && (e.key === 'y' || e.key === 'Y')) {
+          e.preventDefault();
+          redo();
+          return;
         }
-      };
+
+        // Escape: close help, then context menu, then deselect
+        if (e.key === 'Escape') {
+          const help = document.getElementById('help-popover');
+          if (help.classList.contains('show')) { help.classList.remove('show'); return; }
+          if (document.getElementById('ctx-menu').classList.contains('show')) { hideCtxMenu(); return; }
+          if (inField) { e.target.blur(); return; }
+          if (state.linkDrag) { state.linkDrag = null; document.querySelector('#map-canvas #link-preview')?.remove(); updateHint(); return; }
+          clearSelection();
+          return;
+        }
+
+        if (inField) return;
+
+        if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); ctxDelete(); return; }
+        if (e.key === '?') { e.preventDefault(); toggleHelp(); return; }
+        if (e.key === 'n' || e.key === 'N') { e.preventDefault(); addTrack(); return; }
+        if (e.key === 'd' || e.key === 'D') { e.preventDefault(); ctxDuplicate(); return; }
+        if (e.key === 'Enter') {
+          if (state.selection) { e.preventDefault(); focusInspectorRename(); }
+          return;
+        }
+        if (e.key === '+' || e.key === '=') { e.preventDefault(); zoomIn(); return; }
+        if (e.key === '-' || e.key === '_') { e.preventDefault(); zoomOut(); return; }
+        if (e.key === '0') { e.preventDefault(); zoomReset(); return; }
+      });
     }
     
     // =============================================
@@ -950,10 +913,9 @@
     function renderTrackList() {
       const el = document.getElementById('track-list');
       el.innerHTML = state.data.tracks.map((t, i) => `
-        <div class="track-item ${state.selection?.type==='track'&&state.selection.trackIdx===i?'selected':''}" 
+        <div class="track-item ${state.selection?.type==='track'&&state.selection.trackIdx===i?'selected':''}"
              data-track-idx="${i}"
-             draggable="true"
-             onclick="selectTrack(${i})" ondblclick="editTrack(${i})">
+             draggable="true">
           <div class="track-drag" title="Drag to reorder">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
               <circle cx="9" cy="6" r="2"/><circle cx="15" cy="6" r="2"/>
@@ -961,21 +923,68 @@
               <circle cx="9" cy="18" r="2"/><circle cx="15" cy="18" r="2"/>
             </svg>
           </div>
-          <div class="track-dot" style="background:${t.color||'#1e3a8a'}"></div>
+          <div class="track-dot" style="background:${t.color||'#1e3a8a'}" title="Click to edit color"></div>
           <div class="track-info">
-            <div class="track-name">${t.name||'Unnamed'}</div>
+            <div class="track-name" title="Double-click to rename">${escapeHtml(t.name)||'Unnamed'}</div>
             <div class="track-meta">${t.stations?.length||0} stations</div>
           </div>
+          <button class="track-add-btn" title="Add station to this track">+</button>
         </div>
       `).join('');
-      
-      // Add drag-and-drop event listeners
+
+      // Wire item interactions
       el.querySelectorAll('.track-item').forEach(item => {
+        const i = parseInt(item.dataset.trackIdx);
+        item.addEventListener('click', e => {
+          // Ignore clicks on the inline add button or drag handle
+          if (e.target.closest('.track-add-btn')) return;
+          if (e.target.closest('.track-drag')) return;
+          selectTrack(i);
+        });
+        const nameEl = item.querySelector('.track-name');
+        nameEl.addEventListener('dblclick', e => {
+          e.stopPropagation();
+          startInlineRenameTrack(i, nameEl);
+        });
+        item.querySelector('.track-add-btn').addEventListener('click', e => {
+          e.stopPropagation();
+          addStationToEnd(i);
+        });
+
+        // Drag-and-drop for reordering
         item.addEventListener('dragstart', handleTrackDragStart);
         item.addEventListener('dragend', handleTrackDragEnd);
         item.addEventListener('dragover', handleTrackDragOver);
         item.addEventListener('dragleave', handleTrackDragLeave);
         item.addEventListener('drop', handleTrackDrop);
+      });
+    }
+
+    function startInlineRenameTrack(i, nameEl) {
+      const t = state.data.tracks[i];
+      const original = t.name || '';
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'track-name-input';
+      input.value = original;
+      nameEl.replaceWith(input);
+      input.focus();
+      input.select();
+
+      const finish = (commit) => {
+        if (commit && input.value !== original) {
+          pushHistory();
+          t.name = input.value;
+          render();
+          if (state.selection?.type === 'track' && state.selection.trackIdx === i) renderInspector();
+        } else {
+          render();
+        }
+      };
+      input.addEventListener('blur', () => finish(true));
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+        else if (e.key === 'Escape') { input.value = original; input.blur(); }
       });
     }
     
@@ -1012,6 +1021,7 @@
       e.currentTarget.classList.remove('drag-over');
       
       if (draggedTrackIdx !== null && draggedTrackIdx !== targetIdx) {
+        pushHistory();
         // Reorder tracks
         const tracks = state.data.tracks;
         const [movedTrack] = tracks.splice(draggedTrackIdx, 1);
@@ -1047,144 +1057,332 @@
     
     function applySelection() {
       document.querySelectorAll('#map-canvas .station').forEach(el => el.classList.remove('selected'));
-      if (state.selection?.type === 'station') {
-        const el = document.querySelector(`#map-canvas .station[data-track="${state.selection.trackIdx}"][data-station="${state.selection.stationIdx}"]`);
+      document.querySelectorAll('#map-canvas .track-header').forEach(el => el.classList.remove('selected'));
+      document.querySelectorAll('#map-canvas .crossing-marker').forEach(el => el.classList.remove('selected'));
+      const sel = state.selection;
+      if (sel?.type === 'station') {
+        const el = document.querySelector(`#map-canvas .station[data-track="${sel.trackIdx}"][data-station="${sel.stationIdx}"]`);
+        el?.classList.add('selected');
+      } else if (sel?.type === 'track') {
+        const el = document.querySelector(`#map-canvas .track-header[data-track="${sel.trackIdx}"]`);
+        el?.classList.add('selected');
+      } else if (sel?.type === 'crossing') {
+        const el = document.querySelector(`#map-canvas .crossing-marker[data-crossing="${sel.crossingIdx}"]`);
         el?.classList.add('selected');
       }
     }
-    
+
     function updateHint() {
-      const hints = {
-        select: 'Drag stations to reposition. Double-click to edit. Right-click for options.',
-        station: 'Click on a track line to add a station.',
-        crossing: state.crossingStart ? 'Click another station to complete the crossing.' : 'Click a station to start a crossing.'
-      };
-      document.getElementById('hint').textContent = hints[state.tool] || '';
+      const hint = document.getElementById('hint');
+      if (state.linkDrag) {
+        hint.textContent = 'Release on another station (different track) to create a crossing';
+      } else if (state.selection) {
+        hint.textContent = 'Edit in the Inspector · Press D to duplicate, Del to delete, Esc to deselect';
+      } else {
+        hint.textContent = 'Double-click a track line to add a station · Drag stations or labels to reposition · Press ? for shortcuts';
+      }
     }
-    
+
     // =============================================
     // Mouse Events
     // =============================================
     function onMouseDown(e) {
+      const label = e.target.closest('.station-label');
       const station = e.target.closest('.station');
       const trackHeader = e.target.closest('.track-header');
       const crossingMarker = e.target.closest('.crossing-marker');
-      const trackLine = e.target.closest('.track-lines line');
-      
-      if (state.tool === 'select') {
-        if (station) {
-          const ti = +station.dataset.track, si = +station.dataset.station;
-          selectStation(ti, si);
-          startDrag(e, ti, si);
-        } else if (trackHeader) {
-          selectTrack(+trackHeader.dataset.track);
-        } else if (crossingMarker) {
-          selectCrossing(+crossingMarker.dataset.crossing);
+
+      if (label && label.dataset.track !== '' && !e.shiftKey) {
+        // Drag the label only — don't move the station
+        const ti = +label.dataset.track, si = +label.dataset.station;
+        selectStation(ti, si);
+        startLabelDrag(e, ti, si);
+        e.preventDefault();
+        return;
+      }
+
+      if (station) {
+        const ti = +station.dataset.track, si = +station.dataset.station;
+        selectStation(ti, si);
+        if (e.shiftKey) {
+          // Shift-drag from station -> create crossing on release
+          startLinkDrag(ti, si, e);
         } else {
-          clearSelection();
+          startDrag(e, ti, si);
         }
-      } else if (state.tool === 'station') {
-        if (trackLine) addStationOnTrack(e, trackLine);
-      } else if (state.tool === 'crossing') {
-        if (station) handleCrossingClick(+station.dataset.track, +station.dataset.station);
+      } else if (trackHeader) {
+        selectTrack(+trackHeader.dataset.track);
+      } else if (crossingMarker) {
+        selectCrossing(+crossingMarker.dataset.crossing);
+      } else {
+        clearSelection();
       }
     }
-    
+
     function onMouseMove(e) {
       if (state.drag) updateDrag(e);
+      if (state.linkDrag) updateLinkDrag(e);
+      if (state.labelDrag) updateLabelDrag(e);
     }
-    
+
     function onMouseUp(e) {
+      // If a drag actually moved the station, snapshot history
+      if (state.drag && state.drag.snapshot && state.drag.moved) {
+        editHistory.past.push(state.drag.snapshot);
+        if (editHistory.past.length > HISTORY_LIMIT) editHistory.past.shift();
+        editHistory.future.length = 0;
+        updateHistoryButtons();
+      }
+      if (state.labelDrag && state.labelDrag.snapshot && state.labelDrag.moved) {
+        editHistory.past.push(state.labelDrag.snapshot);
+        if (editHistory.past.length > HISTORY_LIMIT) editHistory.past.shift();
+        editHistory.future.length = 0;
+        updateHistoryButtons();
+        renderInspector();
+      }
       state.drag = null;
+      state.labelDrag = null;
+      if (state.linkDrag) endLinkDrag(e);
       document.body.style.cursor = '';
     }
-    
+
+    // Drag a station label to reposition all labels on its track together.
+    // Constrained to the axis perpendicular to the track so labels stay
+    // aligned with their stations along the track axis. Each station's
+    // pre-drag offset is captured so relative differences are preserved.
+    function startLabelDrag(e, trackIdx, stationIdx) {
+      const isH = state.config.orientation === 'horizontal';
+      const stations = state.data.tracks[trackIdx].stations || [];
+      const origPerps = stations.map(s => isH ? (s.labelOffsetY || 0) : (s.labelOffsetX || 0));
+      state.labelDrag = {
+        trackIdx, stationIdx,
+        startX: e.clientX, startY: e.clientY,
+        origPerps,
+        snapshot: snapshotData(),
+        moved: false
+      };
+      document.body.style.cursor = isH ? 'ns-resize' : 'ew-resize';
+    }
+
+    function updateLabelDrag(e) {
+      const d = state.labelDrag;
+      if (!d) return;
+      const isH = state.config.orientation === 'horizontal';
+      const delta = isH ? (e.clientY - d.startY) : (e.clientX - d.startX);
+      const scaledDelta = Math.round(delta / state.zoom);
+      if (Math.abs(scaledDelta) >= 1) d.moved = true;
+      const stations = state.data.tracks[d.trackIdx].stations || [];
+      stations.forEach((s, i) => {
+        const next = (d.origPerps[i] || 0) + scaledDelta;
+        if (isH) {
+          s.labelOffsetY = next || undefined;
+          s.labelOffsetX = undefined;
+        } else {
+          s.labelOffsetX = next || undefined;
+          s.labelOffsetY = undefined;
+        }
+      });
+      suppressHistory = true;
+      render();
+      suppressHistory = false;
+    }
+
     function onDblClick(e) {
       const station = e.target.closest('.station');
       const trackHeader = e.target.closest('.track-header');
       const crossingMarker = e.target.closest('.crossing-marker');
-      
-      if (station) editStation(+station.dataset.track, +station.dataset.station);
-      else if (trackHeader) editTrack(+trackHeader.dataset.track);
-      else if (crossingMarker) editCrossing(+crossingMarker.dataset.crossing);
+      const trackLine = e.target.closest('.track-lines line');
+
+      if (station) {
+        selectStation(+station.dataset.track, +station.dataset.station);
+        focusInspectorRename();
+      } else if (trackHeader) {
+        selectTrack(+trackHeader.dataset.track);
+        focusInspectorRename();
+      } else if (crossingMarker) {
+        selectCrossing(+crossingMarker.dataset.crossing);
+        focusInspectorRename();
+      } else if (trackLine) {
+        addStationOnTrack(e, trackLine);
+      }
     }
-    
+
     function onContextMenu(e) {
       e.preventDefault();
       const station = e.target.closest('.station');
       const crossingMarker = e.target.closest('.crossing-marker');
-      
+      const trackHeader = e.target.closest('.track-header');
+      const trackLine = e.target.closest('.track-lines line');
+
+      ctxMenuTarget = null;
       if (station) {
         selectStation(+station.dataset.track, +station.dataset.station);
-        showCtxMenu(e.clientX, e.clientY);
+        showCtxMenu(e.clientX, e.clientY, 'station');
+      } else if (trackHeader) {
+        selectTrack(+trackHeader.dataset.track);
+        showCtxMenu(e.clientX, e.clientY, 'track');
       } else if (crossingMarker) {
         selectCrossing(+crossingMarker.dataset.crossing);
-        showCtxMenu(e.clientX, e.clientY);
+        showCtxMenu(e.clientX, e.clientY, 'crossing');
+      } else if (trackLine) {
+        // Right-click on a track line — offer "Add station here"
+        ctxMenuTarget = { kind: 'trackLine', event: e, lineEl: trackLine };
+        showCtxMenu(e.clientX, e.clientY, 'trackLine');
+      } else {
+        // Right-click on empty canvas
+        ctxMenuTarget = { kind: 'canvas', x: e.clientX, y: e.clientY };
+        showCtxMenu(e.clientX, e.clientY, 'canvas');
       }
     }
-    
+
     // =============================================
     // Drag & Drop
     // =============================================
     function startDrag(e, trackIdx, stationIdx) {
-      const svg = document.querySelector('#map-canvas svg');
-      const rect = svg.getBoundingClientRect();
       const station = state.data.tracks[trackIdx].stations[stationIdx];
-      
       state.drag = {
         trackIdx, stationIdx,
         startX: e.clientX, startY: e.clientY,
-        origOffset: station.positionOffset || 0
+        origOffset: station.positionOffset || 0,
+        snapshot: snapshotData(),
+        moved: false
       };
       document.body.style.cursor = 'grabbing';
     }
-    
+
     function updateDrag(e) {
       if (!state.drag) return;
       const { trackIdx, stationIdx, startX, startY, origOffset } = state.drag;
       const isH = state.config.orientation === 'horizontal';
-      // Account for zoom level when dragging
       const delta = (isH ? (e.clientX - startX) : (e.clientY - startY)) / state.zoom;
-      
+      if (Math.abs(delta) > 1) state.drag.moved = true;
+
       state.data.tracks[trackIdx].stations[stationIdx].positionOffset = origOffset + delta;
+      suppressHistory = true;
       render();
+      suppressHistory = false;
     }
-    
+
+    // Shift-drag to create crossings
+    function startLinkDrag(trackIdx, stationIdx, e) {
+      const svg = document.querySelector('#map-canvas svg');
+      if (!svg) return;
+      state.linkDrag = { trackIdx, stationIdx, x: e.clientX, y: e.clientY };
+      document.body.style.cursor = 'crosshair';
+      ensureLinkPreview();
+      updateLinkDrag(e);
+      updateHint();
+    }
+
+    function ensureLinkPreview() {
+      const svg = document.querySelector('#map-canvas svg');
+      if (!svg) return;
+      let preview = svg.querySelector('#link-preview');
+      if (!preview) {
+        preview = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        preview.setAttribute('id', 'link-preview');
+        preview.setAttribute('stroke', 'var(--theme-highlight, #ec4899)');
+        preview.setAttribute('stroke-width', '3');
+        preview.setAttribute('stroke-dasharray', '6 4');
+        preview.setAttribute('pointer-events', 'none');
+        svg.appendChild(preview);
+      }
+      return preview;
+    }
+
+    function updateLinkDrag(e) {
+      const svg = document.querySelector('#map-canvas svg');
+      if (!svg || !state.linkDrag) return;
+      const startStation = document.querySelector(`#map-canvas .station[data-track="${state.linkDrag.trackIdx}"][data-station="${state.linkDrag.stationIdx}"] circle`);
+      if (!startStation) return;
+      const svgRect = svg.getBoundingClientRect();
+      const cx = +startStation.getAttribute('cx');
+      const cy = +startStation.getAttribute('cy');
+      // Convert mouse client position to SVG coordinates accounting for zoom
+      const x2 = (e.clientX - svgRect.left) / state.zoom;
+      const y2 = (e.clientY - svgRect.top) / state.zoom;
+      const preview = ensureLinkPreview();
+      preview.setAttribute('x1', cx);
+      preview.setAttribute('y1', cy);
+      preview.setAttribute('x2', x2);
+      preview.setAttribute('y2', y2);
+    }
+
+    function endLinkDrag(e) {
+      const station = e.target.closest('.station');
+      const start = state.linkDrag;
+      state.linkDrag = null;
+      const preview = document.querySelector('#map-canvas #link-preview');
+      preview?.remove();
+      if (!start) return;
+      if (!station) { updateHint(); return; }
+      const ti = +station.dataset.track, si = +station.dataset.station;
+      if (ti === start.trackIdx) {
+        toast('Crossings must connect different tracks');
+        updateHint();
+        return;
+      }
+      pushHistory();
+      state.data.crossings.push({
+        fromTrack: start.trackIdx,
+        toTrack: ti,
+        fromStation: start.stationIdx,
+        toStation: si,
+        color: '#0891b2',
+        style: 'bezier',
+        curvature: 0.5
+      });
+      selectCrossing(state.data.crossings.length - 1);
+      render();
+      toast('Crossing created');
+    }
+
     // =============================================
     // Selection
     // =============================================
     function selectStation(ti, si) {
       state.selection = { type: 'station', trackIdx: ti, stationIdx: si };
       applySelection();
-      renderTrackList();
+      updateTrackListSelection();
+      renderInspector();
+      updateHint();
     }
-    
+
     function selectTrack(ti) {
       state.selection = { type: 'track', trackIdx: ti };
       applySelection();
-      renderTrackList();
+      updateTrackListSelection();
+      renderInspector();
+      updateHint();
     }
-    
+
     function selectCrossing(ci) {
       state.selection = { type: 'crossing', crossingIdx: ci };
       applySelection();
+      updateTrackListSelection();
+      renderInspector();
+      updateHint();
     }
-    
+
     function clearSelection() {
       state.selection = null;
       state.crossingStart = null;
       applySelection();
-      renderTrackList();
+      updateTrackListSelection();
+      renderInspector();
+      updateHint();
     }
-    
-    // =============================================
-    // Tools
-    // =============================================
+
+    function updateTrackListSelection() {
+      const selectedIdx = state.selection?.type === 'track' ? state.selection.trackIdx : -1;
+      document.querySelectorAll('#track-list .track-item').forEach(el => {
+        el.classList.toggle('selected', parseInt(el.dataset.trackIdx) === selectedIdx);
+      });
+    }
+
+    // setTool kept as a stub so any leftover callers don't break
     function setTool(t) {
-      state.tool = t;
-      state.crossingStart = null;
-      document.querySelectorAll('.tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === t));
-      document.getElementById('map-canvas').style.cursor = t === 'select' ? '' : 'crosshair';
+      state.tool = t || 'select';
       updateHint();
     }
     
@@ -1288,6 +1486,7 @@
     // Add Elements
     // =============================================
     function addTrack() {
+      pushHistory();
       const idx = state.data.tracks.length;
       state.data.tracks.push({
         name: `Track ${idx + 1}`,
@@ -1296,59 +1495,97 @@
         stations: [{ name: 'Station 1', status: 'default' }]
       });
       render();
+      selectTrack(idx);
       toast('Track added');
     }
-    
+
     function addStationOnTrack(e, lineEl) {
-      // Find which track
       const lines = document.querySelectorAll('#map-canvas .track-lines line');
       let trackIdx = -1;
       lines.forEach((l, i) => { if (l === lineEl) trackIdx = i; });
-      
-      if (trackIdx >= 0) {
-        const track = state.data.tracks[trackIdx];
-        if (!track.stations) track.stations = [];
-        track.stations.push({ name: `Station ${track.stations.length + 1}`, status: 'default' });
+      if (trackIdx < 0) return;
+
+      pushHistory();
+      const track = state.data.tracks[trackIdx];
+      if (!track.stations) track.stations = [];
+
+      // Try to insert at the click location: figure out which two existing
+      // stations the click falls between and splice in the middle.
+      const insertIdx = computeInsertIndex(trackIdx, e);
+      const newStation = { name: `Station ${track.stations.length + 1}`, status: 'default' };
+      if (insertIdx >= 0 && insertIdx < track.stations.length) {
+        track.stations.splice(insertIdx + 1, 0, newStation);
         render();
-        toast('Station added');
-        setTool('select');
-      }
-    }
-    
-    function handleCrossingClick(ti, si) {
-      if (!state.crossingStart) {
-        state.crossingStart = { trackIdx: ti, stationIdx: si };
-        toast('Now click another station');
-        updateHint();
+        selectStation(trackIdx, insertIdx + 1);
       } else {
-        if (state.crossingStart.trackIdx !== ti) {
-          state.data.crossings.push({
-            fromTrack: state.crossingStart.trackIdx,
-            toTrack: ti,
-            fromStation: state.crossingStart.stationIdx,
-            toStation: si,
-            color: '#0891b2',
-            style: 'bezier',
-            curvature: 0.5
-          });
-          render();
-          toast('Crossing created');
-        }
-        state.crossingStart = null;
-        setTool('select');
+        track.stations.push(newStation);
+        render();
+        selectStation(trackIdx, track.stations.length - 1);
       }
+      toast('Station added');
     }
-    
+
+    function computeInsertIndex(trackIdx, e) {
+      // Find the existing station closest to the click on the same axis.
+      const stations = document.querySelectorAll(`#map-canvas .station[data-track="${trackIdx}"]`);
+      if (stations.length === 0) return -1;
+      const svg = document.querySelector('#map-canvas svg');
+      const svgRect = svg.getBoundingClientRect();
+      const isH = state.config.orientation === 'horizontal';
+      const click = isH ? (e.clientX - svgRect.left) / state.zoom : (e.clientY - svgRect.top) / state.zoom;
+      let bestIdx = -1, bestDist = Infinity;
+      stations.forEach(el => {
+        const idx = +el.dataset.station;
+        const circle = el.querySelector('circle');
+        if (!circle) return;
+        const pos = isH ? +circle.getAttribute('cx') : +circle.getAttribute('cy');
+        if (pos < click) {
+          const d = click - pos;
+          if (d < bestDist) { bestDist = d; bestIdx = idx; }
+        }
+      });
+      return bestIdx;
+    }
+
+    function addStationToEnd(trackIdx) {
+      pushHistory();
+      const track = state.data.tracks[trackIdx];
+      if (!track.stations) track.stations = [];
+      track.stations.push({ name: `Station ${track.stations.length + 1}`, status: 'default' });
+      render();
+      selectStation(trackIdx, track.stations.length - 1);
+      toast('Station added');
+    }
+
     // =============================================
-    // Edit Modals
+    // Inspector Panel
     // =============================================
-    function editStation(ti, si) {
-      const s = state.data.tracks[ti].stations[si];
-      document.getElementById('sta-name').value = s.name || '';
-      document.getElementById('sta-date').value = s.date || '';
-      document.getElementById('sta-radius').value = s.radius || '';
-      
-      // Calculate current offset based on label position
+    function escapeHtml(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    function colorRowHTML(colors, selected, includeGradient) {
+      let html = '<div class="colors-row">';
+      colors.forEach(c => {
+        html += `<div class="color-btn ${c === selected ? 'selected' : ''}" style="background:${c}" data-c="${c}"></div>`;
+      });
+      if (includeGradient) {
+        const gradientColors = currentTheme === 's-theme'
+          ? 'linear-gradient(135deg, #003DA5 0%, #002EFF 100%)'
+          : 'linear-gradient(135deg, #1e3a8a 0%, #D63384 100%)';
+        html += `<div class="color-btn gradient-btn ${selected === 'gradient' ? 'selected' : ''}" style="background:${gradientColors}" data-c="gradient" title="Gradient"></div>`;
+      }
+      html += '</div>';
+      return html;
+    }
+
+    function inspectorEmptyHTML() {
+      return '<div class="inspector-empty">Select a station, track, or crossing on the canvas to edit it.<br><br><span class="inspector-tip">Tip: double-click a track line to add a station.</span></div>';
+    }
+
+    function inspectorStationHTML(s) {
       const labelSide = s.labelSide || 'auto';
       let currentOffset = 0;
       if (labelSide === 'top' || labelSide === 'left') {
@@ -1356,89 +1593,351 @@
       } else {
         currentOffset = s.labelOffsetY || s.labelOffsetX || 0;
       }
-      document.getElementById('sta-offset-val').textContent = currentOffset;
-      
-      document.querySelectorAll('#sta-status .status-pill').forEach(p => {
-        p.classList.toggle('selected', p.dataset.s === (s.status || 'default'));
-      });
-      document.querySelectorAll('#sta-label-pos .status-pill').forEach(p => {
-        p.classList.toggle('selected', p.dataset.p === labelSide);
-      });
-      state.selection = { type: 'station', trackIdx: ti, stationIdx: si };
-      openModal('station');
+      const status = s.status || 'default';
+      const statuses = [
+        ['default', 'Default'], ['completed', 'Done'], ['active', 'Active'],
+        ['milestone', 'Milestone'], ['future', 'Future']
+      ];
+      const sides = [['auto','Auto'],['top','Top'],['bottom','Bottom'],['left','Left'],['right','Right']];
+
+      return `
+        <div class="form-group">
+          <label class="form-label">Name</label>
+          <input type="text" class="form-input" id="ins-sta-name" value="${escapeHtml(s.name)}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Date / Label</label>
+          <input type="text" class="form-input" id="ins-sta-date" placeholder="Q1 2024" value="${escapeHtml(s.date)}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <div class="status-pills" id="ins-sta-status">
+            ${statuses.map(([k, label]) => `<span class="status-pill ${k} ${status === k ? 'selected' : ''}" data-s="${k}">${label}</span>`).join('')}
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Label Position</label>
+          <div class="status-pills" id="ins-sta-label-pos">
+            ${sides.map(([k, label]) => `<span class="status-pill default ${labelSide === k ? 'selected' : ''}" data-p="${k}">${label}</span>`).join('')}
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Label Offset</label>
+            <div class="stepper">
+              <button class="stepper-btn" data-act="off-down">−</button>
+              <span class="stepper-val" id="ins-sta-offset-val">${currentOffset}</span>
+              <button class="stepper-btn" data-act="off-up">+</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Station Size</label>
+            <input type="number" class="form-input" id="ins-sta-radius" placeholder="Default" min="6" max="30" value="${s.radius || ''}">
+          </div>
+        </div>
+        <div class="inspector-actions">
+          <button class="btn btn-secondary btn-sm" data-act="duplicate">Duplicate</button>
+          <button class="btn btn-secondary btn-sm" data-act="reset-pos">Reset Position</button>
+          <button class="btn btn-danger btn-sm" data-act="delete">Delete</button>
+        </div>
+      `;
     }
-    
-    function adjustStationOffset(delta) {
-      const valEl = document.getElementById('sta-offset-val');
-      let val = parseInt(valEl.textContent) || 0;
-      val = Math.max(-50, Math.min(50, val + delta));
-      valEl.textContent = val;
+
+    function inspectorTrackHTML(t) {
+      return `
+        <div class="form-group">
+          <label class="form-label">Name</label>
+          <input type="text" class="form-input" id="ins-trk-name" value="${escapeHtml(t.name)}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <input type="text" class="form-input" id="ins-trk-desc" placeholder="Optional subtitle" value="${escapeHtml(t.description)}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Color</label>
+          ${colorRowHTML(COLORS, t.color, false)}
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Style</label>
+            <select class="form-select" id="ins-trk-style">
+              <option value="solid"${t.style === 'solid' || !t.style ? ' selected' : ''}>Solid</option>
+              <option value="gradient"${t.style === 'gradient' ? ' selected' : ''}>Gradient</option>
+              <option value="dashed"${t.style === 'dashed' ? ' selected' : ''}>Dashed</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Line Width</label>
+            <input type="number" class="form-input" id="ins-trk-line-width" placeholder="Default" min="2" max="16" value="${t.lineWidth || ''}">
+          </div>
+        </div>
+        <div class="inspector-actions">
+          <button class="btn btn-secondary btn-sm" data-act="add-station">+ Add Station</button>
+          <button class="btn btn-danger btn-sm" data-act="delete">Delete Track</button>
+        </div>
+      `;
     }
-    
-    function saveStation() {
-      if (state.selection?.type !== 'station') return;
-      const s = state.data.tracks[state.selection.trackIdx].stations[state.selection.stationIdx];
-      s.name = document.getElementById('sta-name').value;
-      s.date = document.getElementById('sta-date').value || undefined;
-      s.status = document.querySelector('#sta-status .status-pill.selected')?.dataset.s || 'default';
-      
-      const labelPos = document.querySelector('#sta-label-pos .status-pill.selected')?.dataset.p;
-      s.labelSide = labelPos === 'auto' ? undefined : labelPos;
-      
-      // Apply offset based on label position
-      const offset = parseInt(document.getElementById('sta-offset-val').textContent) || 0;
+
+    function inspectorCrossingHTML(c) {
+      const colorSel = c.gradient ? 'gradient' : (c.color || '#0891b2');
+      const marker = c.marker === false ? 'none' : (c.markerStyle || 'circle');
+      return `
+        <div class="form-group">
+          <label class="form-label">Color</label>
+          ${colorRowHTML(COLORS, colorSel, true)}
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Style</label>
+            <select class="form-select" id="ins-cross-style">
+              <option value="bezier"${c.style === 'bezier' ? ' selected' : ''}>Bezier</option>
+              <option value="metro"${c.style === 'metro' ? ' selected' : ''}>Metro 45°</option>
+              <option value="metro-smooth"${c.style === 'metro-smooth' ? ' selected' : ''}>Metro Smooth</option>
+              <option value="straight"${c.style === 'straight' ? ' selected' : ''}>Straight</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Marker</label>
+            <select class="form-select" id="ins-cross-marker">
+              <option value="circle"${marker === 'circle' ? ' selected' : ''}>Circle</option>
+              <option value="diamond"${marker === 'diamond' ? ' selected' : ''}>Diamond</option>
+              <option value="dot"${marker === 'dot' ? ' selected' : ''}>Dot</option>
+              <option value="none"${marker === 'none' ? ' selected' : ''}>None</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Label</label>
+          <input type="text" class="form-input" id="ins-cross-label" placeholder="Integration Point" value="${escapeHtml(c.label)}">
+        </div>
+        <div class="inspector-actions">
+          <button class="btn btn-danger btn-sm" data-act="delete">Delete Crossing</button>
+        </div>
+      `;
+    }
+
+    function renderInspector() {
+      const body = document.getElementById('inspector-body');
+      const titleEl = document.getElementById('inspector-title');
+      const sel = state.selection;
+
+      if (!sel) {
+        titleEl.textContent = 'Inspector';
+        body.innerHTML = inspectorEmptyHTML();
+        return;
+      }
+
+      if (sel.type === 'station') {
+        const t = state.data.tracks[sel.trackIdx];
+        const s = t?.stations?.[sel.stationIdx];
+        if (!s) { state.selection = null; renderInspector(); return; }
+        titleEl.textContent = `Station · ${t.name || 'Track ' + (sel.trackIdx + 1)}`;
+        body.innerHTML = inspectorStationHTML(s);
+        bindStationInspector(sel);
+      } else if (sel.type === 'track') {
+        const t = state.data.tracks[sel.trackIdx];
+        if (!t) { state.selection = null; renderInspector(); return; }
+        titleEl.textContent = 'Track';
+        body.innerHTML = inspectorTrackHTML(t);
+        bindTrackInspector(sel);
+      } else if (sel.type === 'crossing') {
+        const c = state.data.crossings[sel.crossingIdx];
+        if (!c) { state.selection = null; renderInspector(); return; }
+        titleEl.textContent = 'Crossing';
+        body.innerHTML = inspectorCrossingHTML(c);
+        bindCrossingInspector(sel);
+      }
+    }
+
+    // Track an in-progress text edit so undo collapses it into one entry
+    let _editSnapshot = null;
+    function bindTextEdit(input, applyFn) {
+      input.addEventListener('focus', () => { _editSnapshot = snapshotData(); });
+      input.addEventListener('input', () => {
+        suppressHistory = true;
+        applyFn(input.value);
+        render();
+        suppressHistory = false;
+      });
+      input.addEventListener('blur', () => {
+        if (_editSnapshot && _editSnapshot !== snapshotData()) {
+          editHistory.past.push(_editSnapshot);
+          if (editHistory.past.length > HISTORY_LIMIT) editHistory.past.shift();
+          editHistory.future.length = 0;
+          updateHistoryButtons();
+        }
+        _editSnapshot = null;
+      });
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') input.blur();
+      });
+    }
+
+    function applyStationLabelOffset(s, valNum) {
       const side = s.labelSide || (state.config.orientation === 'horizontal' ? 'top' : 'right');
-      
-      // Reset both offsets
       s.labelOffsetX = undefined;
       s.labelOffsetY = undefined;
-      
-      // Apply offset in the appropriate direction
-      if (offset !== 0) {
-        if (side === 'top') s.labelOffsetY = -offset;
-        else if (side === 'bottom') s.labelOffsetY = offset;
-        else if (side === 'left') s.labelOffsetX = -offset;
-        else if (side === 'right') s.labelOffsetX = offset;
+      if (valNum !== 0) {
+        if (side === 'top') s.labelOffsetY = -valNum;
+        else if (side === 'bottom') s.labelOffsetY = valNum;
+        else if (side === 'left') s.labelOffsetX = -valNum;
+        else if (side === 'right') s.labelOffsetX = valNum;
       }
-      
-      const radius = parseInt(document.getElementById('sta-radius').value) || 0;
-      s.radius = radius || undefined;
-      
-      closeModal('station');
-      render();
     }
-    
-    function editTrack(ti) {
-      const t = state.data.tracks[ti];
-      document.getElementById('trk-name').value = t.name || '';
-      document.getElementById('trk-desc').value = t.description || '';
-      document.getElementById('trk-style').value = t.style || 'solid';
-      document.getElementById('trk-line-width').value = t.lineWidth || '';
-      document.querySelectorAll('#trk-colors .color-btn').forEach(b => {
-        b.classList.toggle('selected', b.dataset.c === t.color);
+
+    function bindStationInspector(sel) {
+      const s = state.data.tracks[sel.trackIdx].stations[sel.stationIdx];
+      const nameInput = document.getElementById('ins-sta-name');
+      const dateInput = document.getElementById('ins-sta-date');
+      const radiusInput = document.getElementById('ins-sta-radius');
+
+      bindTextEdit(nameInput, v => { s.name = v; renderTrackList(); });
+      bindTextEdit(dateInput, v => { s.date = v || undefined; });
+
+      radiusInput.addEventListener('change', () => {
+        pushHistory();
+        const r = parseInt(radiusInput.value);
+        s.radius = r > 0 ? r : undefined;
+        render();
       });
-      state.selection = { type: 'track', trackIdx: ti };
-      openModal('track');
+
+      document.querySelectorAll('#ins-sta-status .status-pill').forEach(p => {
+        p.addEventListener('click', () => {
+          pushHistory();
+          s.status = p.dataset.s;
+          renderInspector();
+          render();
+        });
+      });
+
+      document.querySelectorAll('#ins-sta-label-pos .status-pill').forEach(p => {
+        p.addEventListener('click', () => {
+          pushHistory();
+          const newSide = p.dataset.p;
+          // Recompute offset value relative to new side
+          const valEl = document.getElementById('ins-sta-offset-val');
+          const cur = parseInt(valEl.textContent) || 0;
+          s.labelSide = newSide === 'auto' ? undefined : newSide;
+          applyStationLabelOffset(s, cur);
+          renderInspector();
+          render();
+        });
+      });
+
+      const stepDown = document.querySelector('#inspector-body [data-act="off-down"]');
+      const stepUp = document.querySelector('#inspector-body [data-act="off-up"]');
+      const valEl = document.getElementById('ins-sta-offset-val');
+      function adjustOffset(delta) {
+        let val = parseInt(valEl.textContent) || 0;
+        val = Math.max(-50, Math.min(50, val + delta));
+        valEl.textContent = val;
+        pushHistory();
+        applyStationLabelOffset(s, val);
+        render();
+      }
+      stepDown.addEventListener('click', e => adjustOffset(e.shiftKey ? -10 : -1));
+      stepUp.addEventListener('click', e => adjustOffset(e.shiftKey ? 10 : 1));
+
+      document.querySelector('#inspector-body [data-act="duplicate"]').addEventListener('click', ctxDuplicate);
+      document.querySelector('#inspector-body [data-act="reset-pos"]').addEventListener('click', ctxResetPos);
+      document.querySelector('#inspector-body [data-act="delete"]').addEventListener('click', ctxDelete);
     }
-    
-    function saveTrack() {
-      if (state.selection?.type !== 'track') return;
-      const t = state.data.tracks[state.selection.trackIdx];
-      t.name = document.getElementById('trk-name').value;
-      t.description = document.getElementById('trk-desc').value || undefined;
-      t.style = document.getElementById('trk-style').value;
-      t.color = document.querySelector('#trk-colors .color-btn.selected')?.dataset.c || '#1e3a8a';
-      
-      const lineWidth = parseInt(document.getElementById('trk-line-width').value) || 0;
-      t.lineWidth = lineWidth || undefined;
-      
-      closeModal('track');
-      render();
+
+    function bindTrackInspector(sel) {
+      const t = state.data.tracks[sel.trackIdx];
+      const nameInput = document.getElementById('ins-trk-name');
+      const descInput = document.getElementById('ins-trk-desc');
+      const styleSelect = document.getElementById('ins-trk-style');
+      const lineWidthInput = document.getElementById('ins-trk-line-width');
+
+      bindTextEdit(nameInput, v => { t.name = v; renderTrackList(); });
+      bindTextEdit(descInput, v => { t.description = v || undefined; });
+
+      styleSelect.addEventListener('change', () => {
+        pushHistory();
+        t.style = styleSelect.value;
+        render();
+      });
+
+      lineWidthInput.addEventListener('change', () => {
+        pushHistory();
+        const w = parseInt(lineWidthInput.value);
+        t.lineWidth = w > 0 ? w : undefined;
+        render();
+      });
+
+      document.querySelectorAll('#inspector-body .colors-row .color-btn').forEach(b => {
+        b.addEventListener('click', () => {
+          pushHistory();
+          t.color = b.dataset.c;
+          renderInspector();
+          render();
+          renderTrackList();
+        });
+      });
+
+      document.querySelector('#inspector-body [data-act="add-station"]').addEventListener('click', () => {
+        addStationToEnd(sel.trackIdx);
+      });
+      document.querySelector('#inspector-body [data-act="delete"]').addEventListener('click', () => {
+        deleteSelectedTrack();
+      });
     }
-    
-    function deleteTrack() {
+
+    function bindCrossingInspector(sel) {
+      const c = state.data.crossings[sel.crossingIdx];
+      const styleSelect = document.getElementById('ins-cross-style');
+      const markerSelect = document.getElementById('ins-cross-marker');
+      const labelInput = document.getElementById('ins-cross-label');
+
+      bindTextEdit(labelInput, v => { c.label = v || undefined; });
+
+      styleSelect.addEventListener('change', () => {
+        pushHistory();
+        c.style = styleSelect.value;
+        render();
+      });
+      markerSelect.addEventListener('change', () => {
+        pushHistory();
+        const m = markerSelect.value;
+        c.marker = m !== 'none';
+        c.markerStyle = m === 'none' ? undefined : m;
+        render();
+      });
+
+      document.querySelectorAll('#inspector-body .colors-row .color-btn').forEach(b => {
+        b.addEventListener('click', () => {
+          pushHistory();
+          const v = b.dataset.c;
+          c.color = v;
+          c.gradient = v === 'gradient';
+          renderInspector();
+          render();
+        });
+      });
+
+      document.querySelector('#inspector-body [data-act="delete"]').addEventListener('click', () => {
+        deleteSelectedCrossing();
+      });
+    }
+
+    function focusInspectorRename() {
+      // Find first text input in inspector and focus+select
+      const input = document.querySelector('#inspector-body input[type="text"]');
+      if (input) {
+        input.focus();
+        input.select();
+      }
+    }
+
+    function closeInspector() {
+      clearSelection();
+    }
+
+    function deleteSelectedTrack() {
       if (state.selection?.type !== 'track') return;
       if (!confirm('Delete this track and all stations?')) return;
+      pushHistory();
       const idx = state.selection.trackIdx;
       state.data.tracks.splice(idx, 1);
       state.data.crossings = state.data.crossings.filter(c => c.fromTrack !== idx && c.toTrack !== idx);
@@ -1446,104 +1945,120 @@
         if (c.fromTrack > idx) c.fromTrack--;
         if (c.toTrack > idx) c.toTrack--;
       });
-      closeModal('track');
       clearSelection();
       render();
       toast('Track deleted');
     }
-    
-    function editCrossing(ci) {
-      const c = state.data.crossings[ci];
-      document.getElementById('cross-style').value = c.style || 'bezier';
-      document.getElementById('cross-marker').value = c.marker === false ? 'none' : (c.markerStyle || 'circle');
-      document.getElementById('cross-label').value = c.label || '';
-      const colorToSelect = c.gradient ? 'gradient' : (c.color || '#0891b2');
-      document.querySelectorAll('#cross-colors .color-btn').forEach(b => {
-        b.classList.toggle('selected', b.dataset.c === colorToSelect);
-      });
-      state.selection = { type: 'crossing', crossingIdx: ci };
-      openModal('crossing');
-    }
-    
-    function saveCrossing() {
+
+    function deleteSelectedCrossing() {
       if (state.selection?.type !== 'crossing') return;
-      const c = state.data.crossings[state.selection.crossingIdx];
-      c.style = document.getElementById('cross-style').value;
-      c.label = document.getElementById('cross-label').value || undefined;
-      const selectedColor = document.querySelector('#cross-colors .color-btn.selected')?.dataset.c || '#0891b2';
-      c.color = selectedColor;
-      c.gradient = selectedColor === 'gradient';
-      const marker = document.getElementById('cross-marker').value;
-      c.marker = marker !== 'none';
-      c.markerStyle = marker === 'none' ? undefined : marker;
-      closeModal('crossing');
-      render();
-    }
-    
-    function deleteCrossing() {
-      if (state.selection?.type !== 'crossing') return;
+      pushHistory();
       state.data.crossings.splice(state.selection.crossingIdx, 1);
-      closeModal('crossing');
       clearSelection();
       render();
       toast('Crossing deleted');
     }
-    
+
+    // =============================================
+    // Help / Keyboard cheat sheet
+    // =============================================
+    function toggleHelp() {
+      document.getElementById('help-popover').classList.toggle('show');
+    }
+
     // =============================================
     // Context Menu
     // =============================================
-    function showCtxMenu(x, y) {
+    let ctxMenuTarget = null;
+    function showCtxMenu(x, y, kind) {
       const m = document.getElementById('ctx-menu');
+      // Show/hide items based on selection type
+      m.querySelectorAll('.ctx-item').forEach(item => {
+        const showFor = item.dataset.showFor;
+        item.style.display = !showFor || showFor.split(',').includes(kind) ? '' : 'none';
+      });
       m.style.left = x + 'px';
       m.style.top = y + 'px';
       m.classList.add('show');
     }
-    
+
     function hideCtxMenu() {
       document.getElementById('ctx-menu').classList.remove('show');
+      ctxMenuTarget = null;
     }
-    
+
     function ctxEdit() {
       hideCtxMenu();
-      if (state.selection?.type === 'station') editStation(state.selection.trackIdx, state.selection.stationIdx);
-      else if (state.selection?.type === 'crossing') editCrossing(state.selection.crossingIdx);
+      focusInspectorRename();
     }
-    
+
     function ctxDuplicate() {
       hideCtxMenu();
       if (state.selection?.type === 'station') {
+        pushHistory();
         const t = state.data.tracks[state.selection.trackIdx];
-        const copy = { ...t.stations[state.selection.stationIdx] };
-        copy.name += ' (copy)';
+        const copy = JSON.parse(JSON.stringify(t.stations[state.selection.stationIdx]));
+        copy.name = (copy.name || 'Station') + ' (copy)';
         delete copy.positionOffset;
-        t.stations.splice(state.selection.stationIdx + 1, 0, copy);
+        const newIdx = state.selection.stationIdx + 1;
+        t.stations.splice(newIdx, 0, copy);
         render();
+        selectStation(state.selection.trackIdx, newIdx);
         toast('Station duplicated');
+      } else if (state.selection?.type === 'track') {
+        pushHistory();
+        const t = state.data.tracks[state.selection.trackIdx];
+        const copy = JSON.parse(JSON.stringify(t));
+        copy.name = (copy.name || 'Track') + ' (copy)';
+        copy.color = COLORS[state.data.tracks.length % COLORS.length];
+        state.data.tracks.push(copy);
+        render();
+        selectTrack(state.data.tracks.length - 1);
+        toast('Track duplicated');
       }
     }
-    
+
     function ctxResetPos() {
       hideCtxMenu();
       if (state.selection?.type === 'station') {
-        delete state.data.tracks[state.selection.trackIdx].stations[state.selection.stationIdx].positionOffset;
+        pushHistory();
+        const s = state.data.tracks[state.selection.trackIdx].stations[state.selection.stationIdx];
+        delete s.positionOffset;
+        delete s.labelOffsetX;
+        delete s.labelOffsetY;
+        delete s.labelSide;
         render();
+        renderInspector();
         toast('Position reset');
       }
     }
-    
+
     function ctxDelete() {
       hideCtxMenu();
       if (state.selection?.type === 'station') {
+        pushHistory();
         state.data.tracks[state.selection.trackIdx].stations.splice(state.selection.stationIdx, 1);
         clearSelection();
         render();
         toast('Station deleted');
       } else if (state.selection?.type === 'crossing') {
-        state.data.crossings.splice(state.selection.crossingIdx, 1);
-        clearSelection();
-        render();
-        toast('Crossing deleted');
+        deleteSelectedCrossing();
+      } else if (state.selection?.type === 'track') {
+        deleteSelectedTrack();
       }
+    }
+
+    function ctxAddStationHere() {
+      hideCtxMenu();
+      if (ctxMenuTarget?.kind === 'trackLine') {
+        addStationOnTrack(ctxMenuTarget.event, ctxMenuTarget.lineEl);
+      }
+      ctxMenuTarget = null;
+    }
+
+    function ctxAddTrack() {
+      hideCtxMenu();
+      addTrack();
     }
     
     // =============================================
@@ -1556,17 +2071,6 @@
       map.resetCanvasSize();
       render();
       toast('All positions reset');
-    }
-    
-    // =============================================
-    // Modal
-    // =============================================
-    function openModal(name) {
-      document.getElementById('modal-' + name).classList.add('show');
-    }
-    
-    function closeModal(name) {
-      document.getElementById('modal-' + name).classList.remove('show');
     }
     
     // =============================================
@@ -1661,7 +2165,8 @@
       reader.onload = function(ev) {
         try {
           var obj = JSON.parse(ev.target.result);
-          
+          pushHistory();
+
           // Import data (handle both formats: {data:...} and direct {tracks:...})
           var src = obj.data || obj;
           state.data = {
@@ -1863,6 +2368,203 @@
     }
     .save-status svg {
       opacity: 0.7;
+    }
+
+    /* ============================================= */
+    /* Inspector Panel                               */
+    /* ============================================= */
+    .inspector {
+      grid-column: 3;
+      grid-row: 2 / 4;
+      background: var(--theme-white, #fff);
+      border-left: 1px solid var(--theme-border, #e2e8f0);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-width: 0;
+    }
+    .inspector-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: var(--theme-light, #f8fafc);
+      border-bottom: 1px solid var(--theme-border, #e2e8f0);
+    }
+    .inspector-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--theme-muted, #64748b);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .inspector-close {
+      background: none;
+      border: none;
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+      color: var(--theme-muted, #64748b);
+      padding: 0 4px;
+    }
+    .inspector-close:hover { color: var(--theme-text, #1e293b); }
+    .inspector-body {
+      padding: 12px;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .inspector-empty {
+      font-size: 12px;
+      color: var(--theme-muted, #64748b);
+      line-height: 1.5;
+      padding: 8px 4px;
+    }
+    .inspector-tip {
+      font-size: 11px;
+      color: var(--theme-muted, #94a3b8);
+      font-style: italic;
+    }
+    .inspector-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px solid var(--theme-border, #e2e8f0);
+    }
+    .inspector-actions .btn { flex: 1 1 auto; }
+    .colors-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    @media (max-width: 900px) {
+      .inspector { display: none; }
+      .app { grid-template-columns: 280px 1fr; }
+    }
+
+    /* ============================================= */
+    /* Help / Cheat-sheet popover                    */
+    /* ============================================= */
+    .help-popover {
+      position: fixed;
+      top: 100px;
+      right: 300px;
+      width: 300px;
+      background: var(--theme-white, #fff);
+      border: 1px solid var(--theme-border, #e2e8f0);
+      border-radius: 8px;
+      box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12);
+      z-index: 200;
+      display: none;
+    }
+    .help-popover.show { display: block; }
+    .help-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: var(--theme-light, #f8fafc);
+      border-bottom: 1px solid var(--theme-border, #e2e8f0);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--theme-muted, #64748b);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-radius: 8px 8px 0 0;
+    }
+    .help-body { padding: 10px 12px 12px; }
+    .help-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 4px 0;
+      font-size: 12px;
+      color: var(--theme-text, #1e293b);
+    }
+    .help-row span { flex: 1; }
+    .help-tip {
+      font-size: 11px !important;
+      color: var(--theme-muted, #64748b) !important;
+      font-style: italic;
+    }
+    .help-sep { height: 1px; background: var(--theme-border, #e2e8f0); margin: 8px 0; }
+    .help-popover kbd {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      background: var(--theme-light, #f1f5f9);
+      border: 1px solid var(--theme-border, #cbd5e1);
+      border-bottom-width: 2px;
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-size: 10px;
+      color: var(--theme-text, #1e293b);
+      min-width: 18px;
+      display: inline-block;
+      text-align: center;
+    }
+
+    /* ============================================= */
+    /* Sidebar track row enhancements                */
+    /* ============================================= */
+    .track-add-btn {
+      background: transparent;
+      border: 1px dashed var(--theme-border, #cbd5e1);
+      color: var(--theme-muted, #94a3b8);
+      width: 22px; height: 22px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      line-height: 1;
+      flex-shrink: 0;
+      opacity: 0;
+      transition: opacity 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .track-item:hover .track-add-btn { opacity: 1; }
+    .track-add-btn:hover {
+      color: var(--theme-accent, #3b82f6);
+      border-color: var(--theme-accent, #3b82f6);
+    }
+    .track-name-input {
+      width: 100%;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 2px 4px;
+      border: 1px solid var(--theme-accent, #3b82f6);
+      border-radius: 3px;
+      font-family: inherit;
+    }
+    .track-name-input:focus { outline: none; }
+
+    /* ============================================= */
+    /* Canvas hover affordances                      */
+    /* ============================================= */
+    #map-canvas .track-lines line {
+      cursor: copy;
+      transition: stroke-opacity 0.1s;
+    }
+    #map-canvas .track-lines line:hover {
+      stroke-opacity: 0.85;
+    }
+    #map-canvas .track-header.selected rect {
+      stroke: var(--theme-highlight, #ec4899) !important;
+      stroke-width: 3px !important;
+    }
+    #map-canvas .crossing-marker.selected {
+      filter: drop-shadow(0 0 6px var(--theme-highlight, #ec4899));
+    }
+
+    /* Station labels are draggable */
+    #map-canvas .station-label {
+      cursor: move;
+    }
+    #map-canvas .station-label:hover text {
+      paint-order: stroke;
+      stroke: var(--theme-highlight, #ec4899);
+      stroke-width: 0.5px;
     }
   </style>
 </body>

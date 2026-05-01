@@ -74,7 +74,7 @@ body {
 
 .app {
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: 280px 1fr 280px;
   grid-template-rows: auto auto 1fr;
   height: 100vh;
 }
@@ -107,7 +107,7 @@ body {
 /* ============================================= */
 
 .toolbar-row {
-  grid-column: 2 / -1;
+  grid-column: 2 / 3;
   background: var(--theme-white);
   border-bottom: 1px solid var(--theme-border);
   padding: 8px 16px;
