@@ -44,6 +44,14 @@ Single-file application with:
 - Inline JavaScript for all interactivity
 - State management via `state` object containing `config` and `data`
 
+### Layout Pre-pass
+
+`render()` calls `computeLayout()` first. It measures text (`measureText`, canvas-based) and derives:
+- effective station spacing (horizontal) and track spacing (vertical), so labels and headers don't collide
+- the horizontal station start and the header gaps, so track header boxes clear the first station's label
+
+Use `effStationSpacing()` / `effTrackSpacing()` instead of the raw config values. Station labels stack away from the station: upward on `top`, centred on `left`/`right`.
+
 ## Data Model
 
 ### Project Format (JSON Export)
@@ -210,9 +218,20 @@ const json = JSON.stringify({ config: state.config, data: state.data }, null, 2)
 - **Track Modal** (`#track-modal`) - Edit track properties
 - **Crossing Modal** (`#crossing-modal`) - Edit crossing properties
 
-### Floating Panels
+### Panels
 
-- **Legend Panel** - Draggable status legend
+- **Inspector** (`#inspector`) - Edits the current selection. Below 1180px it becomes a slide-over (`.app.inspector-open`)
+- **Sidebar** - Below 820px it becomes a drawer toggled from the toolbar (`.app.sidebar-open`)
+- **Legend Panel** - Docked bottom-left of the canvas, collapsed by default
+- **Confirm dialog** (`showConfirm`) - In-page replacement for `confirm()`
+
+### Input Model (mouse, pen, touch)
+
+- The canvas uses Pointer Events (`onPointerDown/Move/Up/Cancel`), with move/up listeners on `window`
+- Tap, double-tap (`handleDoubleTap`) and long-press (opens the context menu) are detected in the pointer handlers; native `dblclick` is ignored
+- Pinch zoom and two-finger pan use Touch Events (`setupPinchZoom`)
+- Client ↔ SVG coordinates go through `clientToSvg()` / `svgScale()`; never divide by `state.zoom` directly
+- Touch devices get invisible `.touch-hit` circles around stations; they are marked `data-export="false"` and stripped by `toSVG()`
 
 ## Key Functions
 
@@ -222,11 +241,12 @@ const json = JSON.stringify({ config: state.config, data: state.data }, null, 2)
 const state = {
   config: { /* map configuration */ },
   data: { title: '', tracks: [], crossings: [], phases: [], timeMarkers: [] },
-  tool: 'select',       // Current tool mode
+  tool: 'select',       // 'select' | 'connect'
   selection: null,      // Selected element
   crossingStart: null,  // Crossing creation state
   drag: null,           // Drag operation state
   zoom: 1,
+  pan: { x: 0, y: 0 },  // view translation (Fit, pinch)
   sizeMode: 'auto'      // 'auto' | 'manual'
 };
 ```
@@ -300,10 +320,14 @@ function exportJSON() {
 - Drag operations use direct DOM manipulation for responsiveness
 - Large maps (50+ stations) may benefit from virtualization (not implemented)
 
+### Undo History
+
+Snapshots (`snapshotData`) hold both `data` and `config` (minus theme `colors`). Call `pushHistory()` before any change to either. Text inputs use `bindTextEdit` to collapse a typing session into a single undo step.
+
 ### Testing
 
 Test any changes with:
-1. Browser preview (Chrome/Firefox/Safari)
+1. Browser preview (Chrome/Firefox/Safari), plus iPad or touch emulation
 2. SVG export → open in Inkscape
 3. JSON export → import → verify all settings restored
 4. Theme switching → verify colors update
