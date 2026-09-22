@@ -74,7 +74,7 @@ body {
 
 .app {
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: 300px 1fr;
   grid-template-rows: auto auto 1fr;
   height: 100vh;
 }
@@ -107,7 +107,7 @@ body {
 /* ============================================= */
 
 .toolbar-row {
-  grid-column: 2 / -1;
+  grid-column: 2 / 3;
   background: var(--theme-white);
   border-bottom: 1px solid var(--theme-border);
   padding: 8px 16px;
@@ -346,11 +346,11 @@ body {
 /* Interactive SVG */
 #map-canvas .station { cursor: grab; }
 #map-canvas .station:active { cursor: grabbing; }
-#map-canvas .station.selected circle:first-of-type { 
+#map-canvas .station.selected .station-dot { 
   stroke: var(--theme-accent) !important; 
   stroke-width: 5px !important;
 }
-#map-canvas .station:hover circle:first-of-type { filter: brightness(1.1); }
+#map-canvas .station:hover .station-dot { filter: brightness(1.1); }
 #map-canvas .track-header { cursor: pointer; }
 #map-canvas .track-header:hover rect { fill: var(--theme-light); }
 #map-canvas .crossing-marker { cursor: pointer; }

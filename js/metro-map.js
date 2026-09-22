@@ -79,6 +79,116 @@ class MetroMap {
     return MetroMap.COLORS[name];
   }
 
+  // Measure rendered text width using an offscreen canvas (falls back to an estimate)
+  measureText(str, size, weight = 400) {
+    if (!str) return 0;
+    try {
+      if (!MetroMap._measureCtx && typeof document !== 'undefined') {
+        MetroMap._measureCtx = document.createElement('canvas').getContext('2d');
+      }
+      const ctx = MetroMap._measureCtx;
+      if (ctx) {
+        ctx.font = `${weight} ${size}px ${this.config.fontFamily}`;
+        return ctx.measureText(String(str)).width;
+      }
+    } catch (e) { /* fall through to estimate */ }
+    return String(str).length * size * 0.6;
+  }
+
+  // Effective station radius, accounting for milestone status
+  getStationRadius(station) {
+    const base = station?.radius || this.config.stationRadius;
+    const status = station?.status || 'default';
+    if (status === 'milestone') return base + 4;
+    if (status === 'milestone-lg') return base + 8;
+    return base;
+  }
+
+  // Default label side for a track when neither track nor station overrides it.
+  // Horizontal: alternate top/bottom. Vertical: push outermost tracks outward.
+  getDefaultLabelSide(trackIdx) {
+    const trackCount = this.data.tracks.length;
+    if (this.isHorizontal()) return trackIdx % 2 === 0 ? 'top' : 'bottom';
+    if (trackCount <= 2) return trackIdx === 0 ? 'left' : 'right';
+    if (trackIdx === 0) return 'left';
+    if (trackIdx === trackCount - 1) return 'right';
+    return trackIdx % 2 === 0 ? 'right' : 'left';
+  }
+
+  // Text metrics for a station label block (name, optional date, optional description)
+  getLabelMetrics(station) {
+    const { text, fontSizeAdjust } = this.config;
+    const sizeAdj = fontSizeAdjust || 0;
+    const nameSize = Math.max(6, text.stationName.size + sizeAdj);
+    const dateSize = Math.max(6, text.stationDate.size + sizeAdj);
+    const descSize = Math.max(6, text.stationDesc.size + sizeAdj);
+    const lineStep = Math.max(14, text.stationName.size + sizeAdj + 2);
+    const lines = [{ text: station.name, size: nameSize, weight: text.stationName.weight }];
+    if (station.date) lines.push({ text: station.date, size: dateSize, weight: text.stationDate.weight });
+    if (station.description) lines.push({ text: station.description, size: descSize, weight: text.stationDesc.weight });
+    const width = Math.max(...lines.map(l => this.measureText(l.text, l.size, l.weight)));
+    return { lines, lineStep, width, extra: (lines.length - 1) * lineStep };
+  }
+
+  // Track header box size, measuring name and description with their own font sizes
+  getHeaderBox(track) {
+    const { text, fontSizeAdjust, titlePadding } = this.config;
+    const sizeAdj = fontSizeAdjust || 0;
+    const titleSize = Math.max(6, text.trackName.size + sizeAdj);
+    const descSize = Math.max(6, text.trackDesc.size + sizeAdj);
+    const boxPadding = titlePadding || 12;
+    const textWidth = Math.max(
+      this.measureText(track.name, titleSize, text.trackName.weight),
+      this.measureText(track.description, descSize, text.trackDesc.weight)
+    );
+    return {
+      width: Math.max(70, Math.ceil(textWidth + boxPadding * 2)),
+      height: track.description ? titleSize + descSize + boxPadding + 8 : titleSize + boxPadding + 4,
+      titleSize, descSize
+    };
+  }
+
+  // Layout pre-pass: derive spacing that keeps headers and labels from colliding
+  computeLayout() {
+    const { padding, trackSpacing, stationSpacing } = this.config;
+    const tracks = this.data.tracks || [];
+    const headerWidths = tracks.map(t => this.getHeaderBox(t).width);
+    const layout = { trackSpacing, stationSpacing, headerGaps: [], stationStart: 0 };
+
+    if (this.isHorizontal()) {
+      let widest = 0;
+      tracks.forEach((track, ti) => {
+        const defSide = track.labelSide || this.getDefaultLabelSide(ti);
+        let gap = 15 + this.getStationRadius(track.stations?.[0]);
+        (track.stations || []).forEach((station, si) => {
+          const side = station.labelSide || defSide;
+          if (side !== 'top' && side !== 'bottom') return;
+          const w = this.getLabelMetrics(station).width;
+          widest = Math.max(widest, w);
+          if (si === 0) gap = Math.max(gap, w / 2 + 10);
+        });
+        layout.headerGaps[ti] = gap;
+      });
+      // Grow station spacing so adjacent labels don't overlap (capped at 2x the configured gap)
+      layout.stationSpacing = Math.max(stationSpacing, Math.min(widest + 16, stationSpacing * 2));
+      const need = tracks.reduce((m, t, i) => Math.max(m, headerWidths[i] + layout.headerGaps[i]), 0);
+      layout.stationStart = Math.max(padding.left + 130, padding.left * 0.5 + need);
+    } else {
+      tracks.forEach((track, ti) => {
+        layout.headerGaps[ti] = 15 + this.getStationRadius(track.stations?.[0]);
+      });
+      // Grow track spacing so neighbouring header boxes don't overlap
+      const maxHeader = Math.max(0, ...headerWidths);
+      layout.trackSpacing = Math.max(trackSpacing, maxHeader + 16);
+      layout.stationStart = padding.top + 70;
+    }
+    this._layout = layout;
+    return layout;
+  }
+
+  effTrackSpacing() { return this._layout?.trackSpacing || this.config.trackSpacing; }
+  effStationSpacing() { return this._layout?.stationSpacing || this.config.stationSpacing; }
+
   constructor(container, config = {}) {
     this.container = typeof container === 'string' 
       ? document.querySelector(container) 
@@ -124,8 +234,9 @@ class MetroMap {
   calculateDimensions() {
     const trackCount = this.data.tracks?.length || 1;
     const padding = this.config.padding || { top: 80, right: 60, bottom: 80, left: 60 };
-    const trackSpacing = this.config.trackSpacing || 120;
-    const stationSpacing = this.config.stationSpacing || 100;
+    const trackSpacing = this.effTrackSpacing() || 120;
+    const stationSpacing = this.effStationSpacing() || 100;
+    const stationStart = this._layout?.stationStart || (padding.left + 130);
 
     // If autoFit is disabled, use manual dimensions directly
     if (!this.config.autoFit) {
@@ -153,7 +264,7 @@ class MetroMap {
     let contentRight, contentBottom;
     if (this.isHorizontal()) {
       const contentHeight = (trackCount - 1) * trackSpacing;
-      contentRight = stationExtent + padding.left + 200;
+      contentRight = stationStart + stationExtent + padding.right + 60;
       contentBottom = contentHeight + padding.top + padding.bottom + 80;
     } else {
       const contentWidth = (trackCount - 1) * trackSpacing;
@@ -200,7 +311,7 @@ class MetroMap {
 
   getTrackPos(trackIndex) {
     const count = this.data.tracks.length;
-    const spacing = this.config.trackSpacing;
+    const spacing = this.effTrackSpacing();
     
     if (this.isHorizontal()) {
       const totalHeight = (count - 1) * spacing;
@@ -214,14 +325,10 @@ class MetroMap {
   }
 
   getStationPos(stationIndex, offset = 0) {
-    const spacing = this.config.stationSpacing;
-    
-    if (this.isHorizontal()) {
-      // More space for track headers (wider boxes)
-      return this.config.padding.left + 130 + stationIndex * spacing + offset;
-    } else {
-      return this.config.padding.top + 70 + stationIndex * spacing + offset;
-    }
+    const spacing = this.effStationSpacing();
+    const start = this._layout?.stationStart
+      ?? (this.isHorizontal() ? this.config.padding.left + 130 : this.config.padding.top + 70);
+    return start + stationIndex * spacing + offset;
   }
 
   getStationCoords(trackIndex, stationIndex, station = null) {
@@ -234,6 +341,7 @@ class MetroMap {
   }
 
   render() {
+    this.computeLayout();
     this.calculateDimensions();
     
     this.svg = this.createSVG('svg', {
@@ -319,8 +427,8 @@ class MetroMap {
       const color = phase.color || this.getColor('primary');
       
       if (this.isHorizontal()) {
-        const x1 = this.getStationPos(phase.startStation) - this.config.stationSpacing / 2;
-        const x2 = this.getStationPos(phase.endStation) + this.config.stationSpacing / 2;
+        const x1 = this.getStationPos(phase.startStation) - this.effStationSpacing() / 2;
+        const x2 = this.getStationPos(phase.endStation) + this.effStationSpacing() / 2;
         
         group.appendChild(this.createSVG('rect', {
           x: x1, y: padding.top - 10, width: x2 - x1, height: this.config.height - padding.top - padding.bottom + 20,
@@ -334,8 +442,8 @@ class MetroMap {
         label.textContent = phase.name;
         group.appendChild(label);
       } else {
-        const y1 = this.getStationPos(phase.startStation) - this.config.stationSpacing / 2;
-        const y2 = this.getStationPos(phase.endStation) + this.config.stationSpacing / 2;
+        const y1 = this.getStationPos(phase.startStation) - this.effStationSpacing() / 2;
+        const y2 = this.getStationPos(phase.endStation) + this.effStationSpacing() / 2;
         
         group.appendChild(this.createSVG('rect', {
           x: padding.left, y: y1, width: this.config.width - padding.left - padding.right, height: y2 - y1,
@@ -493,90 +601,43 @@ class MetroMap {
       return `M ${from.x} ${from.y} L ${to.x} ${to.y}`;
     }
     
-    if (style === 'metro' || style === 'step') {
-      // Metro style with consistent angle - use 0.4 factor (no cap to maintain angle at all distances)
-      if (this.isHorizontal()) {
-        const midX = from.x + dx / 2;
-        const offset = Math.abs(dy) * 0.4;
-        return `M ${from.x} ${from.y} L ${midX - offset} ${from.y} L ${midX + offset} ${to.y} L ${to.x} ${to.y}`;
-      } else {
-        const midY = from.y + dy / 2;
-        const offset = Math.abs(dx) * 0.4;
-        return `M ${from.x} ${from.y} L ${from.x} ${midY - offset} L ${to.x} ${midY + offset} L ${to.x} ${to.y}`;
+    if (style === 'metro' || style === 'step' || style === 'metro-smooth' || style === 'rounded') {
+      // Work in track-aligned coordinates: 'along' runs with the tracks,
+      // 'perp' crosses between them. The diagonal keeps a consistent angle
+      // (0.4 factor) but is clamped so it never extends past either station;
+      // aligned stations get a straight perpendicular connector.
+      const horiz = this.isHorizontal();
+      const toXY = (a, p) => horiz ? { x: a, y: p } : { x: p, y: a };
+      const fa = horiz ? from.x : from.y, fp = horiz ? from.y : from.x;
+      const ta = horiz ? to.x : to.y, tp = horiz ? to.y : to.x;
+      const along = ta - fa, perp = tp - fp;
+      const dir = along >= 0 ? 1 : -1;
+      const offset = Math.min(Math.abs(perp) * 0.4, Math.abs(along) / 2);
+      const mid = fa + along / 2;
+      const c1 = toXY(mid - dir * offset, fp);
+      const c2 = toXY(mid + dir * offset, tp);
+      const pt = p => `${p.x} ${p.y}`;
+
+      if (offset < 0.5) {
+        return `M ${from.x} ${from.y} L ${to.x} ${to.y}`;
       }
-    }
-    
-    if (style === 'metro-smooth' || style === 'rounded') {
-      // Metro style with smooth rounded corners - same angle as metro
-      const r = 18; // Corner radius
-      
-      if (this.isHorizontal()) {
-        const midX = from.x + dx / 2;
-        const offset = Math.abs(dy) * 0.4;
-        
-        // Sharp corner positions
-        const c1x = midX - offset;
-        const c1y = from.y;
-        const c2x = midX + offset;
-        const c2y = to.y;
-        
-        // Diagonal direction vector (normalized)
-        const diagDx = c2x - c1x;
-        const diagDy = c2y - c1y;
-        const diagLen = Math.sqrt(diagDx * diagDx + diagDy * diagDy);
-        const diagUnitX = diagDx / diagLen;
-        const diagUnitY = diagDy / diagLen;
-        
-        // Limit radius based on available space
-        const maxR = Math.min(r, offset * 0.6, diagLen * 0.3);
-        
-        // Corner 1: horizontal → diagonal
-        const c1_start_x = c1x - maxR;
-        const c1_start_y = c1y;
-        const c1_end_x = c1x + diagUnitX * maxR;
-        const c1_end_y = c1y + diagUnitY * maxR;
-        
-        // Corner 2: diagonal → horizontal
-        const c2_start_x = c2x - diagUnitX * maxR;
-        const c2_start_y = c2y - diagUnitY * maxR;
-        const c2_end_x = c2x + maxR;
-        const c2_end_y = c2y;
-        
-        return `M ${from.x} ${from.y} L ${c1_start_x} ${c1_start_y} Q ${c1x} ${c1y} ${c1_end_x} ${c1_end_y} L ${c2_start_x} ${c2_start_y} Q ${c2x} ${c2y} ${c2_end_x} ${c2_end_y} L ${to.x} ${to.y}`;
-      } else {
-        const midY = from.y + dy / 2;
-        const offset = Math.abs(dx) * 0.4;
-        
-        // Sharp corner positions
-        const c1x = from.x;
-        const c1y = midY - offset;
-        const c2x = to.x;
-        const c2y = midY + offset;
-        
-        // Diagonal direction vector (normalized)
-        const diagDx = c2x - c1x;
-        const diagDy = c2y - c1y;
-        const diagLen = Math.sqrt(diagDx * diagDx + diagDy * diagDy);
-        const diagUnitX = diagDx / diagLen;
-        const diagUnitY = diagDy / diagLen;
-        
-        // Limit radius
-        const maxR = Math.min(r, offset * 0.6, diagLen * 0.3);
-        
-        // Corner 1: vertical → diagonal
-        const c1_start_x = c1x;
-        const c1_start_y = c1y - maxR;
-        const c1_end_x = c1x + diagUnitX * maxR;
-        const c1_end_y = c1y + diagUnitY * maxR;
-        
-        // Corner 2: diagonal → vertical
-        const c2_start_x = c2x - diagUnitX * maxR;
-        const c2_start_y = c2y - diagUnitY * maxR;
-        const c2_end_x = c2x;
-        const c2_end_y = c2y + maxR;
-        
-        return `M ${from.x} ${from.y} L ${c1_start_x} ${c1_start_y} Q ${c1x} ${c1y} ${c1_end_x} ${c1_end_y} L ${c2_start_x} ${c2_start_y} Q ${c2x} ${c2y} ${c2_end_x} ${c2_end_y} L ${to.x} ${to.y}`;
+      if (style === 'metro' || style === 'step') {
+        return `M ${pt(from)} L ${pt(c1)} L ${pt(c2)} L ${pt(to)}`;
       }
+
+      // Rounded corners at both bends
+      const diagDx = c2.x - c1.x, diagDy = c2.y - c1.y;
+      const diagLen = Math.sqrt(diagDx * diagDx + diagDy * diagDy);
+      const ux = diagDx / diagLen, uy = diagDy / diagLen;
+      const r = Math.min(18, offset * 0.6, diagLen * 0.3, Math.abs(along) / 2 - offset);
+      if (r < 0.5) {
+        return `M ${pt(from)} L ${pt(c1)} L ${pt(c2)} L ${pt(to)}`;
+      }
+      const c1Start = toXY((horiz ? c1.x : c1.y) - dir * r, fp);
+      const c1End = { x: c1.x + ux * r, y: c1.y + uy * r };
+      const c2Start = { x: c2.x - ux * r, y: c2.y - uy * r };
+      const c2End = toXY((horiz ? c2.x : c2.y) + dir * r, tp);
+      return `M ${pt(from)} L ${pt(c1Start)} Q ${pt(c1)} ${pt(c1End)} L ${pt(c2Start)} Q ${pt(c2)} ${pt(c2End)} L ${pt(to)}`;
     }
     
     // Smooth bezier - exits perpendicular to track direction
@@ -648,8 +709,13 @@ class MetroMap {
     }
 
     if (crossing.label) {
-      const labelY = midY + (this.isHorizontal() ? -20 : 24);
-      const label = this.createSVG('text', { x: midX, y: labelY, fill: this.getColor('text'), 'font-size': 10, 'font-weight': 600, 'text-anchor': 'middle' });
+      // Horizontal maps: connectors run vertically, so put the label beside the marker
+      const horiz = this.isHorizontal();
+      const label = this.createSVG('text', {
+        x: horiz ? midX + 18 : midX, y: horiz ? midY + 4 : midY + 24,
+        fill: this.getColor('text'), 'font-size': 10, 'font-weight': 600,
+        'text-anchor': horiz ? 'start' : 'middle'
+      });
       label.textContent = crossing.label;
       markerGroup.appendChild(label);
     }
@@ -681,23 +747,7 @@ class MetroMap {
     
     this.data.tracks.forEach((track, trackIdx) => {
       const color = track.color || this.getColor('primary');
-      // Default sides: in horizontal mode, alternate top/bottom per track.
-      // In vertical mode, push outermost tracks outward to avoid the inner
-      // gap collision common to 2-track layouts.
-      const trackCount = this.data.tracks.length;
-      let defaultSide;
-      if (this.isHorizontal()) {
-        defaultSide = trackIdx % 2 === 0 ? 'top' : 'bottom';
-      } else if (trackCount <= 2) {
-        defaultSide = trackIdx === 0 ? 'left' : 'right';
-      } else if (trackIdx === 0) {
-        defaultSide = 'left';
-      } else if (trackIdx === trackCount - 1) {
-        defaultSide = 'right';
-      } else {
-        defaultSide = trackIdx % 2 === 0 ? 'right' : 'left';
-      }
-      const labelSide = track.labelSide || defaultSide;
+      const labelSide = track.labelSide || this.getDefaultLabelSide(trackIdx);
       
       (track.stations || []).forEach((station, stationIdx) => {
         const coords = this.getStationCoords(trackIdx, stationIdx, station);
@@ -717,8 +767,7 @@ class MetroMap {
     const status = station.status || 'default';
     
     // Use per-station radius if specified, otherwise use config default
-    const baseRadius = station.radius || this.config.stationRadius;
-    let radius = baseRadius;
+    let radius = this.getStationRadius(station);
     let fillColor = this.getColor('white');
     let strokeColor = station.color || trackColor;
     let strokeWidth = 4;
@@ -734,12 +783,10 @@ class MetroMap {
         strokeColor = this.getColor('accent');
         break;
       case 'milestone':
-        radius = baseRadius + 4;
         fillColor = strokeColor;
         strokeWidth = 5;
         break;
       case 'milestone-lg':
-        radius = baseRadius + 8;
         fillColor = strokeColor;
         strokeWidth = 0;
         break;
@@ -755,6 +802,7 @@ class MetroMap {
     }
 
     stationGroup.appendChild(this.createSVG('circle', {
+      class: 'station-dot',
       cx: x, cy: y, r: radius, fill: fillColor, stroke: strokeColor,
       'stroke-width': strokeWidth, 'stroke-dasharray': dashed ? '4,3' : 'none', filter: 'url(#shadow)'
     }));
@@ -774,9 +822,8 @@ class MetroMap {
   }
 
   renderStationLabel(group, station, x, y, defaultSide, radius, trackIdx, stationIdx) {
-    const { text, labelOffset, labelRotation, fontSizeAdjust, textColor } = this.config;
+    const { labelOffset, labelRotation, textColor, text } = this.config;
     const offset = radius + labelOffset;
-    const sizeAdj = fontSizeAdjust || 0;
     
     // Use station's labelSide if specified, otherwise use track default
     const side = station.labelSide || defaultSide;
@@ -784,34 +831,25 @@ class MetroMap {
     // Get custom offsets from station
     const customOffsetX = station.labelOffsetX || 0;
     const customOffsetY = station.labelOffsetY || 0;
+
+    // Multi-line blocks grow away from the station: upward for 'top',
+    // centred on the station for 'left'/'right', downward for 'bottom'.
+    const { lines, lineStep, extra } = this.getLabelMetrics(station);
     
     let labelX, labelY, textAnchor, rotation = labelRotation;
     
-    if (this.isHorizontal()) {
-      textAnchor = 'middle';
-      labelX = x;
-      labelY = side === 'top' ? y - offset : y + offset + 14;
-      // For horizontal, allow left/right to work too
-      if (side === 'left') { textAnchor = 'end'; labelX = x - offset; labelY = y + 4; }
-      else if (side === 'right') { textAnchor = 'start'; labelX = x + offset; labelY = y + 4; }
-    } else {
-      labelY = y + 4;
-      if (side === 'left') { textAnchor = 'end'; labelX = x - offset; }
-      else if (side === 'right') { textAnchor = 'start'; labelX = x + offset; }
-      else if (side === 'top') { textAnchor = 'middle'; labelX = x; labelY = y - offset; }
-      else if (side === 'bottom') { textAnchor = 'middle'; labelX = x; labelY = y + offset + 14; }
-      else { textAnchor = 'start'; labelX = x + offset; }
-    }
+    if (side === 'left') { textAnchor = 'end'; labelX = x - offset; labelY = y + 4 - extra / 2; }
+    else if (side === 'right') { textAnchor = 'start'; labelX = x + offset; labelY = y + 4 - extra / 2; }
+    else if (side === 'top') { textAnchor = 'middle'; labelX = x; labelY = y - offset - extra; }
+    else if (side === 'bottom') { textAnchor = 'middle'; labelX = x; labelY = y + offset + 14; }
+    else { textAnchor = 'start'; labelX = x + offset; labelY = y + 4 - extra / 2; }
     
     // Apply custom offsets
     labelX += customOffsetX;
     labelY += customOffsetY;
     
-    // Use global textColor and apply size adjustment to base sizes
+    // Use global textColor, falling back to the station name color
     const labelColor = textColor || text.stationName.color;
-    const labelSize = text.stationName.size + sizeAdj;
-    const dateSize = text.stationDate.size + sizeAdj;
-    const descSize = text.stationDesc.size + sizeAdj;
 
     const labelGroup = this.createSVG('g', {
       class: 'station-label',
@@ -822,38 +860,16 @@ class MetroMap {
       labelGroup.setAttribute('transform', `rotate(${rotation} ${labelX} ${labelY})`);
     }
 
-    const name = this.createSVG('text', {
-      x: labelX, y: labelY,
-      fill: labelColor,
-      'font-size': Math.max(6, labelSize),
-      'font-weight': text.stationName.weight, 'text-anchor': textAnchor
+    lines.forEach((line, i) => {
+      const el = this.createSVG('text', {
+        x: labelX, y: labelY + i * lineStep,
+        fill: labelColor,
+        'font-size': line.size,
+        'font-weight': line.weight, 'text-anchor': textAnchor
+      });
+      el.textContent = line.text;
+      labelGroup.appendChild(el);
     });
-    name.textContent = station.name;
-    labelGroup.appendChild(name);
-
-    if (station.date) {
-      const dateY = labelY + Math.max(14, labelSize + 2);
-      const date = this.createSVG('text', {
-        x: labelX, y: dateY,
-        fill: labelColor,
-        'font-size': Math.max(6, dateSize),
-        'font-weight': text.stationDate.weight, 'text-anchor': textAnchor
-      });
-      date.textContent = station.date;
-      labelGroup.appendChild(date);
-    }
-
-    if (station.description) {
-      const descY = labelY + (station.date ? Math.max(28, (labelSize + 2) * 2) : Math.max(14, labelSize + 2));
-      const desc = this.createSVG('text', {
-        x: labelX, y: descY,
-        fill: labelColor,
-        'font-size': Math.max(6, descSize),
-        'font-weight': text.stationDesc.weight, 'text-anchor': textAnchor
-      });
-      desc.textContent = station.description;
-      labelGroup.appendChild(desc);
-    }
 
     group.appendChild(labelGroup);
   }
@@ -876,14 +892,8 @@ class MetroMap {
       const borderColor = titleBorderColor || this.getColor('border');
       const boxPadding = titlePadding || 12;
       
-      // Calculate box dimensions based on text length and adjusted size
-      const nameLength = (track.name || '').length;
-      const descLength = (track.description || '').length;
-      const maxLength = Math.max(nameLength, descLength);
-      
-      const charWidth = titleSize * 0.65;
-      let boxWidth = Math.max(90, maxLength * charWidth + boxPadding * 2);
-      let boxHeight = track.description ? titleSize + descSize + boxPadding + 8 : titleSize + boxPadding + 4;
+      // Box dimensions from measured text
+      const { width: boxWidth, height: boxHeight } = this.getHeaderBox(track);
       
       // Get the position and size of the first station
       const firstStation = stations[0];
@@ -891,32 +901,17 @@ class MetroMap {
         ? this.getStationCoords(idx, 0, firstStation)
         : null;
       
-      // Calculate first station radius (same logic as renderStation)
-      let firstStationRadius = this.config.stationRadius;
-      if (firstStation) {
-        const baseRadius = firstStation.radius || this.config.stationRadius;
-        const status = firstStation.status || 'default';
-        if (status === 'milestone') {
-          firstStationRadius = baseRadius + 4;
-        } else if (status === 'milestone-lg') {
-          firstStationRadius = baseRadius + 8;
-        } else {
-          firstStationRadius = baseRadius;
-        }
-      }
-      
-      // Gap between station and label box
-      const gap = 15;
+      // Distance from first station centre to the box edge (radius + gap,
+      // widened in horizontal mode to clear the first station's label)
+      const gap = this._layout?.headerGaps?.[idx] ?? (this.getStationRadius(firstStation) + 15);
       
       let x, y;
       if (this.isHorizontal()) {
-        // Position to the left of the first station, accounting for station radius
-        x = firstStationCoords ? firstStationCoords.x - firstStationRadius - gap : padding.left + 120;
+        x = firstStationCoords ? firstStationCoords.x - gap : padding.left + 120;
         y = this.getTrackPos(idx);
       } else {
         x = this.getTrackPos(idx);
-        // Position above the first station, accounting for station radius
-        y = firstStationCoords ? firstStationCoords.y - firstStationRadius - gap : padding.top + 40;
+        y = firstStationCoords ? firstStationCoords.y - gap : padding.top + 40;
       }
 
       // Wrap header elements in a group for interactivity
@@ -1032,6 +1027,9 @@ class MetroMap {
     svgClone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
     svgClone.setAttribute('version', '1.1');
     
+    // Drop editor-only helpers (e.g. touch hit areas)
+    svgClone.querySelectorAll('[data-export="false"]').forEach(el => el.remove());
+
     // Remove interactive classes that won't be styled
     svgClone.removeAttribute('class');
     

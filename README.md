@@ -269,6 +269,8 @@ The builder exports a complete project file containing both configuration and da
 | `metro-smooth` | Rounded 45° corners |
 | `straight` | Direct line |
 
+For `metro` and `metro-smooth`, the diagonal never extends past either station. Stations at the same position along the track get a straight connector.
+
 ## Methods
 
 ```javascript
@@ -356,23 +358,28 @@ A full-featured WYSIWYG editor is included at `metro-map-builder.html`.
 ### Builder Features
 
 - Drag-and-drop station positioning
-- Visual track and station editing
-- Crossing creation tool
-- Real-time preview
+- Always-visible Inspector (Edit tab) for tracks, stations and crossings
+- Material (MUI) icons
+- **Connect** tool for creating crossings (or Shift-drag between stations)
+- Undo/redo for map content *and* settings
+- Real-time preview with automatic label and header spacing
 - **Complete JSON import/export** (preserves all settings)
 - SVG and PNG export
-- Zoom controls (5% - 500%)
+- Zoom controls (10% - 500%) and **Fit** to screen
 - Canvas size presets
 - Theme switching (Default / S-Theme)
+- **Touch & tablet support** (iPad): tap, drag, double-tap, long-press, pinch-to-zoom
 
 ### Using the Builder
 
 1. Open `metro-map-builder.html` in a browser
-2. Add tracks using the sidebar
-3. Click on tracks to add stations
-4. Use the Crossing tool to connect stations
-5. Double-click elements to edit properties
+2. Add tracks using the sidebar or toolbar
+3. Double-click (double-tap) a track line to add a station
+4. Use **Connect** to link stations on different tracks
+5. Select anything to edit it in the Inspector; right-click (long-press) for quick actions
 6. Export JSON when finished
+
+The left panel has two tabs. **Edit** shows the Inspector for the current selection plus the track list. **Map** holds the global settings. Selecting something never resizes the canvas. On phones, the panel opens from the ☰ button, or from the **Edit** button that appears when something is selected.
 
 ### JSON Import/Export
 
@@ -577,7 +584,7 @@ img.src = url;
 
 - Chrome 60+
 - Firefox 55+
-- Safari 12+
+- Safari 13+ (iPadOS 13+)
 - Edge 79+
 
 ## License
