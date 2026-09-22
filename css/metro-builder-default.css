@@ -74,7 +74,7 @@ body {
 
 .app {
   display: grid;
-  grid-template-columns: 280px 1fr 280px;
+  grid-template-columns: 300px 1fr;
   grid-template-rows: auto auto 1fr;
   height: 100vh;
 }

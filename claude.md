@@ -220,8 +220,9 @@ const json = JSON.stringify({ config: state.config, data: state.data }, null, 2)
 
 ### Panels
 
-- **Inspector** (`#inspector`) - Edits the current selection. Below 1180px it becomes a slide-over (`.app.inspector-open`)
-- **Sidebar** - Below 820px it becomes a drawer toggled from the toolbar (`.app.sidebar-open`)
+- **Sidebar tabs** (`setSidebarTab`) - **Edit** (default): the Inspector (`#inspector`, rendered by `renderInspector()`) above the Tracks list. **Map**: title, orientation, layout, text, example/reset. Selecting anything switches to Edit; the canvas width never changes
+- **Sidebar drawer** - Below 700px the sidebar becomes a drawer toggled from the toolbar (`.app.sidebar-open`). Selection never opens it; an "Edit" chip appears instead (`.app.has-selection`)
+- **Icons** - Material icons from `@mui/icons-material` (MIT), inlined once as an SVG sprite after `<body>`. Use `<svg class="icon"><use href="#i-name"/></svg>`
 - **Legend Panel** - Docked bottom-left of the canvas, collapsed by default
 - **Confirm dialog** (`showConfirm`) - In-page replacement for `confirm()`
 
